@@ -1,5 +1,5 @@
 # Use the official Golang image as the base image
-FROM golang:1.22.1-bullseye AS builder
+FROM golang:1.23.9-bullseye AS builder
 ENV CGO_ENABLED=1
 
 # Set the working directory
@@ -9,13 +9,11 @@ WORKDIR /workspace
 COPY cmd/ cmd/
 COPY proto/ proto/
 COPY config.json config.json
-COPY dialer/ dialer/
 COPY registry/ registry/
 COPY services/ services/
 COPY tls/ tls/
 COPY tracing/ tracing/
 COPY tune/ tune/
-COPY go-lib/interceptor go-lib/interceptor
 
 # Copy the go.mod and go.sum files to the workspace
 COPY go.mod go.sum ./
