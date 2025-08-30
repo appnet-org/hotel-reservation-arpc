@@ -7,24 +7,17 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	// "io/ioutil"
-	"net"
-	// "os"
-	"time"
-
-	pb "github.com/appnetorg/HotelReservation/services/geo/proto"
-	"github.com/appnetorg/HotelReservation/tls"
+	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/serializer"
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/geo/proto"
 	"github.com/google/uuid"
 	"github.com/hailocab/go-geoindex"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 )
 
 const (
-	name             = "srv-geo"
 	maxSearchRadius  = 10
 	maxSearchResults = 5
 )
@@ -33,7 +26,6 @@ const (
 type Server struct {
 	index *geoindex.ClusteringIndex
 	uuid  string
-	pb.UnimplementedGeoServer
 
 	Tracer       opentracing.Tracer
 	Port         int
@@ -53,30 +45,18 @@ func (s *Server) Run() error {
 
 	s.uuid = uuid.New().String()
 
-	opts := []grpc.ServerOption{
-		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Timeout: 120 * time.Second,
-		}),
-		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			PermitWithoutStream: true,
-		}),
-	}
+	serializer := &serializer.SymphonySerializer{}
+	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
 
-	if tlsopt := tls.GetServerOpt(); tlsopt != nil {
-		opts = append(opts, tlsopt)
-	}
-
-	srv := grpc.NewServer(opts...)
-
-	pb.RegisterGeoServer(srv, s)
-
-	// listener
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
-		return fmt.Errorf("failed to listen: %v", err)
+		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	return srv.Serve(lis)
+	pb.RegisterGeoServer(server, &Server{})
+
+	server.Start()
+
+	return nil
 }
 
 // Shutdown cleans up any processes
@@ -84,7 +64,7 @@ func (s *Server) Shutdown() {
 }
 
 // Nearby returns all hotels within a given distance.
-func (s *Server) Nearby(ctx context.Context, req *pb.Request) (*pb.Result, error) {
+func (s *Server) Nearby(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
 	log.Trace().Msgf("In geo Nearby")
 	log.Info().Msgf("In geo getNearbyPoints, lat = %f, lon = %f, latstring = %s", req.Lat, req.Lon, req.Latstring)
 
@@ -100,7 +80,7 @@ func (s *Server) Nearby(ctx context.Context, req *pb.Request) (*pb.Result, error
 		res.HotelIds = append(res.HotelIds, p.Id())
 	}
 
-	return res, nil
+	return res, ctx, nil
 }
 
 func (s *Server) getNearbyPoints(ctx context.Context, lat, lon float64) []geoindex.Point {
@@ -137,7 +117,7 @@ func newGeoIndex(session *mgo.Session) *geoindex.ClusteringIndex {
 	var points []*point
 	err := c.Find(bson.M{}).All(&points)
 	if err != nil {
-		log.Error().Msgf("Failed get geo data: ", err)
+		log.Error().Msgf("Failed get geo data: %v", err)
 	}
 
 	// add points to index

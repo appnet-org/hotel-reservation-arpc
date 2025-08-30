@@ -12,10 +12,10 @@ service Reservation {
 
 message Request {
   string customerName = 1;
-  repeated string hotelId = 2;
-  string inDate = 3;
-  string outDate = 4;
-  int32  roomNumber = 5;
+  string inDate = 2;
+  string outDate = 3;
+  int32  roomNumber = 4;
+  repeated string hotelId = 5;
 }
 
 message Result {

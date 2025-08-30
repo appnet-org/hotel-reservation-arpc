@@ -5,24 +5,19 @@ import (
 	// "encoding/json"
 	"fmt"
 
-	interceptor "github.com/appnet-org/go-lib/interceptor"
-	pb "github.com/appnetorg/HotelReservation/services/user/proto"
-	"github.com/appnetorg/HotelReservation/tls"
+	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/serializer"
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/user/proto"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	// "io/ioutil"
-	"net"
 
 	"github.com/rs/zerolog/log"
-
 	// "os"
-	"time"
 )
 
 const name = "srv-user"
@@ -36,7 +31,6 @@ type Server struct {
 	IpAddr       string
 	MongoSession *mgo.Session
 	uuid         string
-	pb.UnimplementedUserServer
 }
 
 // Run starts the server
@@ -51,46 +45,18 @@ func (s *Server) Run() error {
 
 	s.uuid = uuid.New().String()
 
-	opts := []grpc.ServerOption{
-		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Timeout: 120 * time.Second,
-		}),
-		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			PermitWithoutStream: true,
-		}),
-		grpc.UnaryInterceptor(
-			// otgrpc.OpenTracingServerInterceptor(s.Tracer),
-			interceptor.ServerInterceptor("/appnet/interceptors/user"),
-		),
-	}
+	serializer := &serializer.SymphonySerializer{}
+	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
 
-	if tlsopt := tls.GetServerOpt(); tlsopt != nil {
-		opts = append(opts, tlsopt)
-	}
-
-	srv := grpc.NewServer(opts...)
-
-	pb.RegisterUserServer(srv, s)
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
-		log.Fatal().Msgf("failed to listen: %v", err)
+		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	// // register the service
-	// jsonFile, err := os.Open("config.json")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
+	pb.RegisterUserServer(server, &Server{})
 
-	// defer jsonFile.Close()
+	server.Start()
 
-	// byteValue, _ := ioutil.ReadAll(jsonFile)
-
-	// var result map[string]string
-	// json.Unmarshal([]byte(byteValue), &result)
-
-	return srv.Serve(lis)
+	return nil
 }
 
 // Shutdown cleans up any processes
@@ -98,7 +64,7 @@ func (s *Server) Shutdown() {
 }
 
 // CheckUser returns whether the username and password are correct.
-func (s *Server) CheckUser(ctx context.Context, req *pb.Request) (*pb.Result, error) {
+func (s *Server) CheckUser(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
 	res := new(pb.Result)
 
 	log.Trace().Msg("CheckUser")
@@ -128,7 +94,7 @@ func (s *Server) CheckUser(ctx context.Context, req *pb.Request) (*pb.Result, er
 
 	log.Trace().Msgf("CheckUser %d", res.Correct)
 
-	return res, nil
+	return res, ctx, nil
 }
 
 // loadUsers loads hotel users from mongodb.

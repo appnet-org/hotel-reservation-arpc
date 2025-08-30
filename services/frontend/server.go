@@ -7,19 +7,19 @@ import (
 	"net/http"
 	"strconv"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	recommendation "github.com/appnetorg/HotelReservation/services/recommendation/proto"
-	reservation "github.com/appnetorg/HotelReservation/services/reservation/proto"
-	user "github.com/appnetorg/HotelReservation/services/user/proto"
+	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/serializer"
+	recommendation "github.com/appnetorg/hotel-reservation-arpc/services/recommendation/proto"
+	reservation "github.com/appnetorg/hotel-reservation-arpc/services/reservation/proto"
+	user "github.com/appnetorg/hotel-reservation-arpc/services/user/proto"
 	"github.com/rs/zerolog/log"
 
-	"github.com/appnetorg/HotelReservation/dialer"
-	profile "github.com/appnetorg/HotelReservation/services/profile/proto"
-	search "github.com/appnetorg/HotelReservation/services/search/proto"
-	"github.com/appnetorg/HotelReservation/tls"
-	"github.com/appnetorg/HotelReservation/tracing"
+	profile "github.com/appnetorg/hotel-reservation-arpc/services/profile/proto"
+	search "github.com/appnetorg/hotel-reservation-arpc/services/search/proto"
+	"github.com/appnetorg/hotel-reservation-arpc/tls"
+	"github.com/appnetorg/hotel-reservation-arpc/tracing"
 	"github.com/opentracing/opentracing-go"
 )
 
@@ -90,56 +90,60 @@ func (s *Server) Run() error {
 }
 
 func (s *Server) initSearchClient(caller_name, name string) error {
-	conn, err := s.getGprcConn(name, caller_name)
+	serializer := &serializer.SymphonySerializer{}
+
+	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("dialer error: %v", err)
+		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
-	s.searchClient = search.NewSearchClient(conn)
+
+	s.searchClient = search.NewSearchClient(client)
 	return nil
 }
 
 func (s *Server) initProfileClient(caller_name, name string) error {
-	conn, err := s.getGprcConn(name, caller_name)
+	serializer := &serializer.SymphonySerializer{}
+
+	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("dialer error: %v", err)
+		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
-	s.profileClient = profile.NewProfileClient(conn)
+
+	s.profileClient = profile.NewProfileClient(client)
 	return nil
 }
 
 func (s *Server) initRecommendationClient(caller_name, name string) error {
-	conn, err := s.getGprcConn(name, caller_name)
+	serializer := &serializer.SymphonySerializer{}
+
+	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("dialer error: %v", err)
+		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
-	s.recommendationClient = recommendation.NewRecommendationClient(conn)
+	s.recommendationClient = recommendation.NewRecommendationClient(client)
 	return nil
 }
 
 func (s *Server) initUserClient(caller_name, name string) error {
-	conn, err := s.getGprcConn(name, caller_name)
+	serializer := &serializer.SymphonySerializer{}
+
+	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("dialer error: %v", err)
+		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
-	s.userClient = user.NewUserClient(conn)
+	s.userClient = user.NewUserClient(client)
 	return nil
 }
 
 func (s *Server) initReservation(caller_name, name string) error {
-	conn, err := s.getGprcConn(name, caller_name)
-	if err != nil {
-		return fmt.Errorf("dialer error: %v", err)
-	}
-	s.reservationClient = reservation.NewReservationClient(conn)
-	return nil
-}
+	serializer := &serializer.SymphonySerializer{}
 
-func (s *Server) getGprcConn(caller_name, name string) (*grpc.ClientConn, error) {
-	return dialer.Dial(
-		name,
-		caller_name,
-		// dialer.WithTracer(s.Tracer),
-	)
+	client, err := rpc.NewClient(serializer, name, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create aRPC client: %v", err)
+	}
+	s.reservationClient = reservation.NewReservationClient(client)
+	return nil
 }
 
 func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
@@ -174,13 +178,12 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Trace().Msgf("SEARCH [lat: %v, lon: %v, inDate: %v, outDate: %v", lat, lon, inDate, outDate)
 	// search for best hotels
-	var search_header metadata.MD
 	searchResp, err := s.searchClient.Nearby(ctx, &search.NearbyRequest{
 		Lat:     lat,
 		Lon:     lon,
 		InDate:  inDate,
 		OutDate: outDate,
-	}, grpc.Header(&search_header))
+	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -226,7 +229,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Trace().Msg("searchHandler gets profileResp")
 
-	json.NewEncoder(w).Encode(geoJSONResponse(profileResp.Hotels))
+	json.NewEncoder(w).Encode(geoJSONResponse(profileResp))
 }
 
 func (s *Server) recommendHandler(w http.ResponseWriter, r *http.Request) {
@@ -276,7 +279,7 @@ func (s *Server) recommendHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(geoJSONResponse(profileResp.Hotels))
+	json.NewEncoder(w).Encode(geoJSONResponse(profileResp))
 }
 
 func (s *Server) userHandler(w http.ResponseWriter, r *http.Request) {
@@ -390,26 +393,24 @@ func (s *Server) reservationHandler(w http.ResponseWriter, r *http.Request) {
 
 // return a geoJSON response that allows google map to plot points directly on map
 // https://developers.google.com/maps/documentation/javascript/datalayer#sample_geojson
-func geoJSONResponse(hs []*profile.Hotel) map[string]interface{} {
+func geoJSONResponse(hs *profile.Result) map[string]interface{} {
 	fs := []interface{}{}
 
-	for _, h := range hs {
-		fs = append(fs, map[string]interface{}{
-			"type": "Feature",
-			"id":   h.Id,
-			"properties": map[string]string{
-				"name":         h.Name,
-				"phone_number": h.PhoneNumber,
+	fs = append(fs, map[string]interface{}{
+		"type": "Feature",
+		"id":   hs.Id,
+		"properties": map[string]string{
+			"name":         hs.Name,
+			"phone_number": hs.PhoneNumber,
+		},
+		"geometry": map[string]interface{}{
+			"type": "Point",
+			"coordinates": []float32{
+				hs.Lon,
+				hs.Lat,
 			},
-			"geometry": map[string]interface{}{
-				"type": "Point",
-				"coordinates": []float32{
-					h.Address.Lon,
-					h.Address.Lat,
-				},
-			},
-		})
-	}
+		},
+	})
 
 	return map[string]interface{}{
 		"type":     "FeatureCollection",

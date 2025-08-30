@@ -4,21 +4,20 @@ import (
 	// "encoding/json"
 	"fmt"
 
-	interceptor "github.com/appnet-org/go-lib/interceptor"
-	pb "github.com/appnetorg/HotelReservation/services/reservation/proto"
-	"github.com/appnetorg/HotelReservation/tls"
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/reservation/proto"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	// "io/ioutil"
-	"net"
+
 	// "os"
 	"time"
+
+	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/serializer"
 
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/rs/zerolog/log"
@@ -38,7 +37,6 @@ type Server struct {
 	MongoSession *mgo.Session
 	MemcClient   *memcache.Client
 	uuid         string
-	pb.UnimplementedReservationServer
 }
 
 // Run starts the server
@@ -50,49 +48,18 @@ func (s *Server) Run() error {
 	}
 
 	s.uuid = uuid.New().String()
+	serializer := &serializer.SymphonySerializer{}
+	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
 
-	opts := []grpc.ServerOption{
-		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Timeout: 120 * time.Second,
-		}),
-		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			PermitWithoutStream: true,
-		}),
-		grpc.UnaryInterceptor(
-			// otgrpc.OpenTracingServerInterceptor(s.Tracer),
-			interceptor.ServerInterceptor("/appnet/interceptors/geo"),
-		),
-	}
-
-	if tlsopt := tls.GetServerOpt(); tlsopt != nil {
-		opts = append(opts, tlsopt)
-	}
-
-	srv := grpc.NewServer(opts...)
-
-	pb.RegisterReservationServer(srv, s)
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
-		log.Fatal().Msgf("failed to listen: %v", err)
+		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	// register the service
-	// jsonFile, err := os.Open("config.json")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
+	pb.RegisterReservationServer(server, &Server{})
 
-	// defer jsonFile.Close()
+	server.Start()
 
-	// byteValue, _ := ioutil.ReadAll(jsonFile)
-
-	// var result map[string]string
-	// json.Unmarshal([]byte(byteValue), &result)
-
-	log.Trace().Msgf("In reservation s.IpAddr = %s, port = %d", s.IpAddr, s.Port)
-
-	return srv.Serve(lis)
+	return nil
 }
 
 // Shutdown cleans up any processes
@@ -100,7 +67,7 @@ func (s *Server) Shutdown() {
 }
 
 // MakeReservation makes a reservation based on given information
-func (s *Server) MakeReservation(ctx context.Context, req *pb.Request) (*pb.Result, error) {
+func (s *Server) MakeReservation(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
 	res := new(pb.Result)
 	res.HotelId = make([]string, 0)
 
@@ -187,7 +154,7 @@ func (s *Server) MakeReservation(ctx context.Context, req *pb.Request) (*pb.Resu
 		}
 
 		if count+int(req.RoomNumber) > hotel_cap {
-			return res, nil
+			return res, ctx, nil
 		}
 		indate = outdate
 	}
@@ -220,11 +187,11 @@ func (s *Server) MakeReservation(ctx context.Context, req *pb.Request) (*pb.Resu
 
 	res.HotelId = append(res.HotelId, hotelId)
 
-	return res, nil
+	return res, ctx, nil
 }
 
 // CheckAvailability checks if given information is available
-func (s *Server) CheckAvailability(ctx context.Context, req *pb.Request) (*pb.Result, error) {
+func (s *Server) CheckAvailability(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
 	res := new(pb.Result)
 	res.HotelId = make([]string, 0)
 
@@ -402,7 +369,7 @@ func (s *Server) CheckAvailability(ctx context.Context, req *pb.Request) (*pb.Re
 		}
 	}
 
-	return res, nil
+	return res, ctx, nil
 }
 
 type reservation struct {

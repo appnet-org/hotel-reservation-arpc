@@ -7,9 +7,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/appnetorg/HotelReservation/services/profile"
-	"github.com/appnetorg/HotelReservation/tracing"
-	"github.com/appnetorg/HotelReservation/tune"
+	"github.com/appnetorg/hotel-reservation-arpc/services/profile"
+	"github.com/appnetorg/hotel-reservation-arpc/tracing"
+	"github.com/appnetorg/hotel-reservation-arpc/tune"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 

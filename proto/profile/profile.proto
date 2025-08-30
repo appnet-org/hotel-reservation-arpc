@@ -13,30 +13,17 @@ message Request {
 }
 
 message Result {
-  repeated Hotel hotels = 1;
-}
-
-message Hotel {
   string id = 1;
   string name = 2;
   string phoneNumber = 3;
   string description = 4;
-  Address address = 5;
-  repeated Image images = 6;
-}
-
-message Address {
-  string streetNumber = 1;
-  string streetName = 2;
-  string city = 3;
-  string state = 4;
-  string country = 5;
-  string postalCode = 6;
-  float lat = 7;
-  float lon = 8;
-}
-
-message Image {
-  string url = 1;
-  bool default = 2;
+  string streetNumber = 5;
+  string streetName = 6;
+  string city = 7;
+  string state = 8;
+  string country = 9;
+  string postalCode = 10;
+  float lat = 11;
+  float lon = 12;
+  repeated string images_url = 13;
 }

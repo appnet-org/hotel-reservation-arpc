@@ -28,7 +28,7 @@ spec:
       containers:
         - command:
             - ./geo
-          image: xzhu0027/hotelreservation:latest
+          image: xzhu0027/hotel-reservation-arpc:latest
           imagePullPolicy: Always
           name: hotel-reserv-geo
           ports:

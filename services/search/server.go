@@ -4,24 +4,19 @@ import (
 	// "encoding/json"
 	"fmt"
 	// F"io/ioutil"
-	"net"
 
 	"github.com/rs/zerolog/log"
 
 	// "os"
-	"time"
+	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/serializer"
 
-	interceptor "github.com/appnet-org/go-lib/interceptor"
-	"github.com/appnetorg/HotelReservation/dialer"
-	geo "github.com/appnetorg/HotelReservation/services/geo/proto"
-	rate "github.com/appnetorg/HotelReservation/services/rate/proto"
-	pb "github.com/appnetorg/HotelReservation/services/search/proto"
-	"github.com/appnetorg/HotelReservation/tls"
+	geo "github.com/appnetorg/hotel-reservation-arpc/services/geo/proto"
+	rate "github.com/appnetorg/hotel-reservation-arpc/services/rate/proto"
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/search/proto"
 	"github.com/google/uuid"
 	opentracing "github.com/opentracing/opentracing-go"
 	context "golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 )
 
 const name = "srv-search"
@@ -30,7 +25,6 @@ const name = "srv-search"
 type Server struct {
 	geoClient  geo.GeoClient
 	rateClient rate.RateClient
-	pb.UnimplementedSearchServer
 
 	Tracer     opentracing.Tracer
 	Port       int
@@ -49,25 +43,16 @@ func (s *Server) Run() error {
 
 	s.uuid = uuid.New().String()
 
-	opts := []grpc.ServerOption{
-		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Timeout: 120 * time.Second,
-		}),
-		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			PermitWithoutStream: true,
-		}),
-		grpc.UnaryInterceptor(
-			// otgrpc.OpenTracingServerInterceptor(s.Tracer),
-			interceptor.ServerInterceptor("/appnet/interceptors/search"),
-		),
+	serializer := &serializer.SymphonySerializer{}
+	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
+
+	if err != nil {
+		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	if tlsopt := tls.GetServerOpt(); tlsopt != nil {
-		opts = append(opts, tlsopt)
-	}
+	pb.RegisterSearchServer(server, &Server{})
 
-	srv := grpc.NewServer(opts...)
-	pb.RegisterSearchServer(srv, s)
+	server.Start()
 
 	// init grpc clients
 	if err := s.initGeoClient("search", "geo:8083"); err != nil {
@@ -77,25 +62,7 @@ func (s *Server) Run() error {
 		return err
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
-	if err != nil {
-		log.Fatal().Msgf("failed to listen: %v", err)
-	}
-
-	// register with consul
-	// jsonFile, err := os.Open("config.json")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-
-	// defer jsonFile.Close()
-
-	// byteValue, _ := ioutil.ReadAll(jsonFile)
-
-	// var result map[string]string
-	// json.Unmarshal([]byte(byteValue), &result)
-
-	return srv.Serve(lis)
+	return nil
 }
 
 // Shutdown cleans up any processes
@@ -103,33 +70,31 @@ func (s *Server) Shutdown() {
 }
 
 func (s *Server) initGeoClient(caller_name, name string) error {
-	conn, err := s.getGprcConn(name, caller_name)
+	serializer := &serializer.SymphonySerializer{}
+
+	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("dialer error: %v", err)
+		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
-	s.geoClient = geo.NewGeoClient(conn)
+
+	s.geoClient = geo.NewGeoClient(client)
 	return nil
 }
 
 func (s *Server) initRateClient(caller_name, name string) error {
-	conn, err := s.getGprcConn(name, caller_name)
+	serializer := &serializer.SymphonySerializer{}
+
+	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("dialer error: %v", err)
+		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
-	s.rateClient = rate.NewRateClient(conn)
+
+	s.rateClient = rate.NewRateClient(client)
 	return nil
 }
 
-func (s *Server) getGprcConn(caller_name, name string) (*grpc.ClientConn, error) {
-	return dialer.Dial(
-		name,
-		caller_name,
-		// dialer.WithTracer(s.Tracer),
-	)
-}
-
 // Nearby returns ids of nearby hotels ordered by ranking algo
-func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.SearchResult, error) {
+func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.SearchResult, context.Context, error) {
 	// find nearby hotels
 	log.Trace().Msg("Nearby got a message")
 
@@ -142,7 +107,7 @@ func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.SearchR
 		Latstring: fmt.Sprintf("%f", req.Lat),
 	})
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	for _, hid := range nearby.HotelIds {
@@ -156,7 +121,7 @@ func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.SearchR
 		OutDate:  req.OutDate,
 	})
 	if err != nil {
-		return nil, err
+		return nil, ctx, err
 	}
 
 	// TODO(hw): add simple ranking algo to order hotel ids:
@@ -166,10 +131,8 @@ func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.SearchR
 
 	// build the response
 	res := new(pb.SearchResult)
-	for _, ratePlan := range rates.RatePlans {
-		// log.Trace().Msgf("gået RatePlan HotelId = %s, Code = %s", ratePlan.HotelId, ratePlan.Code)
-		res.HotelIds = append(res.HotelIds, ratePlan.HotelId)
-	}
 
-	return res, nil
+	res.HotelIds = append(res.HotelIds, rates.HotelId)
+
+	return res, ctx, nil
 }

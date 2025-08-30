@@ -15,22 +15,13 @@ message Request {
 }
 
 message Result {
-  repeated RatePlan ratePlans = 1;
-}
-
-message RatePlan {
   string hotelId = 1;
   string code = 2;
   string inDate = 3;
   string outDate = 4;
-  RoomType roomType = 5;
-}
-
-message RoomType {
-  double bookableRate = 1;
-  double totalRate = 2;
-  double totalRateInclusive = 3;
-  string code = 4;
-  string currency = 5;
-  string roomDescription = 6;
+  double bookableRate = 5;
+  double totalRate = 6;
+  double totalRateInclusive = 7;
+  string currency = 8;
+  string roomDescription = 9;
 }

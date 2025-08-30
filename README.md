@@ -50,7 +50,7 @@ Start docker containers by running `docker-compose up -d`. All images will be pu
 
 The workload itself can be configured using optional enviroment variables. The avaialbe configuration items are:
 
-- TLS: Environment variable TLS controls the TLS enablement of gRPC and HTTP communications of the microservices in hotelReservation.
+- TLS: Environment variable TLS controls the TLS enablement of gRPC and HTTP communications of the microservices in hotel-reservation-arpc.
     - TLS=0 or not set(default): No TLS enabled for gRPC and HTTP communication.
     - TLS=1: All the gRPC and HTTP communications will be protected by TLS, e.g. `TLS=1 docker-compose up -d`.
     - TLS=<ciphersuite>: Use specified ciphersuite for TLS, e.g. `TLS=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 docker-compose up -d`. The avaialbe cipher suite can be found at the file [options.go](tls/options.go#L21).

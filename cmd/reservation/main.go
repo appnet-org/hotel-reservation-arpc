@@ -8,9 +8,9 @@ import (
 
 	"strconv"
 
-	"github.com/appnetorg/HotelReservation/services/reservation"
-	"github.com/appnetorg/HotelReservation/tracing"
-	"github.com/appnetorg/HotelReservation/tune"
+	"github.com/appnetorg/hotel-reservation-arpc/services/reservation"
+	"github.com/appnetorg/hotel-reservation-arpc/tracing"
+	"github.com/appnetorg/hotel-reservation-arpc/tune"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 

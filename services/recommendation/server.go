@@ -4,25 +4,21 @@ import (
 	// "encoding/json"
 	"fmt"
 
-	interceptor "github.com/appnet-org/go-lib/interceptor"
-	pb "github.com/appnetorg/HotelReservation/services/recommendation/proto"
-	"github.com/appnetorg/HotelReservation/tls"
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/recommendation/proto"
 	"github.com/google/uuid"
 	"github.com/hailocab/go-geoindex"
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	// "io/ioutil"
 	"math"
-	"net"
 
+	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/serializer"
 	// "os"
-	"time"
 	// "strings"
 )
 
@@ -36,7 +32,6 @@ type Server struct {
 	IpAddr       string
 	MongoSession *mgo.Session
 	uuid         string
-	pb.UnimplementedRecommendationServer
 }
 
 // Run starts the server
@@ -51,46 +46,18 @@ func (s *Server) Run() error {
 
 	s.uuid = uuid.New().String()
 
-	opts := []grpc.ServerOption{
-		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Timeout: 120 * time.Second,
-		}),
-		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			PermitWithoutStream: true,
-		}),
-		grpc.UnaryInterceptor(
-			// otgrpc.OpenTracingServerInterceptor(s.Tracer),
-			interceptor.ServerInterceptor("/appnet/interceptors/recommendation"),
-		),
-	}
+	serializer := &serializer.SymphonySerializer{}
+	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
 
-	if tlsopt := tls.GetServerOpt(); tlsopt != nil {
-		opts = append(opts, tlsopt)
-	}
-
-	srv := grpc.NewServer(opts...)
-
-	pb.RegisterRecommendationServer(srv, s)
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
-		log.Fatal().Msgf("failed to listen: %v", err)
+		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	// // register the service
-	// jsonFile, err := os.Open("config.json")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
+	pb.RegisterRecommendationServer(server, &Server{})
 
-	// defer jsonFile.Close()
+	server.Start()
 
-	// byteValue, _ := ioutil.ReadAll(jsonFile)
-
-	// var result map[string]string
-	// json.Unmarshal([]byte(byteValue), &result)
-
-	return srv.Serve(lis)
+	return nil
 }
 
 // Shutdown cleans up any processes
@@ -98,7 +65,7 @@ func (s *Server) Shutdown() {
 }
 
 // GiveRecommendation returns recommendations within a given requirement.
-func (s *Server) GetRecommendations(ctx context.Context, req *pb.Request) (*pb.Result, error) {
+func (s *Server) GetRecommendations(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
 	res := new(pb.Result)
 	log.Trace().Msgf("GetRecommendations")
 	require := req.Require
@@ -157,7 +124,7 @@ func (s *Server) GetRecommendations(ctx context.Context, req *pb.Request) (*pb.R
 		log.Warn().Msgf("Wrong require parameter: %v", require)
 	}
 
-	return res, nil
+	return res, ctx, nil
 }
 
 // loadRecommendations loads hotel recommendations from mongodb.

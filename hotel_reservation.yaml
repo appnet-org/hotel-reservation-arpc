@@ -53,7 +53,7 @@ spec:
       containers:
       - command:
         - ./user
-        image: appnetorg/hotelreservation:latest
+        image: appnetorg/hotel-reservation-arpc:latest
         serviceAccountName: hotel-user
         imagePullPolicy: Always
         name: hotel-reserv-user
@@ -122,7 +122,7 @@ spec:
       containers:
       - command:
         - ./search
-        image: appnetorg/hotelreservation:latest
+        image: appnetorg/hotel-reservation-arpc:latest
         serviceAccountName: hotel-search
         imagePullPolicy: Always
         name: hotel-reserv-search
@@ -192,7 +192,7 @@ spec:
       containers:
       - command:
         - ./reservation
-        image: appnetorg/hotelreservation:latest
+        image: appnetorg/hotel-reservation-arpc:latest
         serviceAccountName: hotel-reservation
         imagePullPolicy: Always
         name: hotel-reserv-reservation
@@ -262,7 +262,7 @@ spec:
       containers:
       - command:
         - ./recommendation
-        image: appnetorg/hotelreservation:latest
+        image: appnetorg/hotel-reservation-arpc:latest
         serviceAccountName: hotel-recommendation
         imagePullPolicy: Always
         name: hotel-reserv-recommendation
@@ -332,7 +332,7 @@ spec:
       containers:
       - command:
         - ./rate
-        image: appnetorg/hotelreservation:latest
+        image: appnetorg/hotel-reservation-arpc:latest
         serviceAccountName: hotel-rate
         imagePullPolicy: Always
         name: hotel-reserv-rate
@@ -402,7 +402,7 @@ spec:
       containers:
       - command:
         - ./profile
-        image: appnetorg/hotelreservation:latest
+        image: appnetorg/hotel-reservation-arpc:latest
         serviceAccountName: hotel-profile
         imagePullPolicy: Always
         name: hotel-reserv-profile
@@ -472,7 +472,7 @@ spec:
       containers:
       - command:
         - ./geo
-        image: appnetorg/hotelreservation:latest
+        image: appnetorg/hotel-reservation-arpc:latest
         serviceAccountName: hotel-geo
         imagePullPolicy: Always
         name: hotel-reserv-geo
@@ -543,7 +543,7 @@ spec:
       containers:
       - command:
         - ./frontend
-        image: appnetorg/hotelreservation:latest
+        image: appnetorg/hotel-reservation-arpc:latest
         serviceAccountName: hotel-frontend
         imagePullPolicy: Always
         name: hotel-reserv-frontend

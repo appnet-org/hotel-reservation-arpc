@@ -1,4 +1,4 @@
-module github.com/appnetorg/hotel-reservation-arpc/services/profile/proto
+module github.com/appnetorg/hotel-reservation-arpc/services/geo/proto
 
 go 1.23.9
 

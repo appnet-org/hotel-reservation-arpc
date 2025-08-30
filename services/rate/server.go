@@ -8,22 +8,19 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	// "io/ioutil"
-	"net"
+
 	// "os"
 	"sort"
 	"sync"
-	"time"
 
+	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/serializer"
 	"github.com/rs/zerolog/log"
 
-	interceptor "github.com/appnet-org/go-lib/interceptor"
-	pb "github.com/appnetorg/HotelReservation/services/rate/proto"
-	"github.com/appnetorg/HotelReservation/tls"
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/rate/proto"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
 	"golang.org/x/net/context"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 
 	"strings"
 
@@ -40,7 +37,6 @@ type Server struct {
 	MongoSession *mgo.Session
 	MemcClient   *memcache.Client
 	uuid         string
-	pb.UnimplementedRateServer
 }
 
 // Run starts the server
@@ -53,46 +49,18 @@ func (s *Server) Run() error {
 
 	s.uuid = uuid.New().String()
 
-	opts := []grpc.ServerOption{
-		grpc.KeepaliveParams(keepalive.ServerParameters{
-			Timeout: 120 * time.Second,
-		}),
-		grpc.KeepaliveEnforcementPolicy(keepalive.EnforcementPolicy{
-			PermitWithoutStream: true,
-		}),
-		grpc.UnaryInterceptor(
-			// otgrpc.OpenTracingServerInterceptor(s.Tracer),
-			interceptor.ServerInterceptor("/appnet/interceptors/rate"),
-		),
-	}
+	serializer := &serializer.SymphonySerializer{}
+	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
 
-	if tlsopt := tls.GetServerOpt(); tlsopt != nil {
-		opts = append(opts, tlsopt)
-	}
-
-	srv := grpc.NewServer(opts...)
-
-	pb.RegisterRateServer(srv, s)
-
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", s.Port))
 	if err != nil {
-		log.Fatal().Msgf("failed to listen: %v", err)
+		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	// register the service
-	// jsonFile, err := os.Open("config.json")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
+	pb.RegisterRateServer(server, &Server{})
 
-	// defer jsonFile.Close()
+	server.Start()
 
-	// byteValue, _ := ioutil.ReadAll(jsonFile)
-
-	// var result map[string]string
-	// json.Unmarshal([]byte(byteValue), &result)
-
-	return srv.Serve(lis)
+	return nil
 }
 
 // Shutdown cleans up any processes
@@ -100,7 +68,7 @@ func (s *Server) Shutdown() {
 }
 
 // GetRates gets rates for hotels for specific date range.
-func (s *Server) GetRates(ctx context.Context, req *pb.Request) (*pb.Result, error) {
+func (s *Server) GetRates(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
 	// res := new(pb.Result)
 	// session, err := mgo.Dial("mongodb-rate")
 	// if err != nil {
@@ -189,30 +157,22 @@ func (s *Server) GetRates(ctx context.Context, req *pb.Request) (*pb.Result, err
 
 	sort.Sort(ratePlans)
 
-	var resultRatePlans []*pb.RatePlan
+	var resultRatePlans []*pb.Result
 	for _, ratePlan := range ratePlans {
-		resultRatePlans = append(resultRatePlans, &pb.RatePlan{
-			HotelId: ratePlan.HotelId,
-			Code:    ratePlan.Code,
-			InDate:  ratePlan.InDate,
-			OutDate: ratePlan.OutDate,
-			RoomType: &pb.RoomType{
-				BookableRate:       ratePlan.RoomType.BookableRate,
-				TotalRate:          ratePlan.RoomType.TotalRate,
-				TotalRateInclusive: ratePlan.RoomType.TotalRateInclusive,
-				Code:               ratePlan.RoomType.Code,
-				Currency:           "USD", // Example, adjust accordingly
-				RoomDescription:    ratePlan.RoomType.RoomDescription,
-			},
+		resultRatePlans = append(resultRatePlans, &pb.Result{
+			HotelId:            ratePlan.HotelId,
+			Code:               ratePlan.Code,
+			InDate:             ratePlan.InDate,
+			OutDate:            ratePlan.OutDate,
+			BookableRate:       ratePlan.RoomType.BookableRate,
+			TotalRate:          ratePlan.RoomType.TotalRate,
+			TotalRateInclusive: ratePlan.RoomType.TotalRateInclusive,
+			Currency:           "USD", // Example, adjust accordingly
+			RoomDescription:    ratePlan.RoomType.RoomDescription,
 		})
 	}
 
-	// Construct the result message
-	result := &pb.Result{
-		RatePlans: resultRatePlans,
-	}
-
-	return result, nil
+	return resultRatePlans[0], ctx, nil
 }
 
 type RoomType struct {

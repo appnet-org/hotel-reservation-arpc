@@ -26,7 +26,7 @@ spec:
       containers:
         - command:
             - ./recommendation
-          image: xzhu0027/hotelreservation:latest
+          image: xzhu0027/hotel-reservation-arpc:latest
           imagePullPolicy: Always
           name: hotel-reserv-recommendation
           ports:

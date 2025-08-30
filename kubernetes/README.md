@@ -43,13 +43,13 @@ curl "http://10.96.88.88:5000/reservation?inDate=2015-04-19&outDate=2015-04-24&l
 
 ##### Template
 ```bash
-cd <path-of-repo>/hotelReservation
+cd <path-of-repo>/hotel-reservation-arpc
 ./wrk -D exp -t <num-threads> -c <num-conns> -d <duration> -L -s ./wrk2_lua_scripts/mixed-workload_type_1.lua http://frontend.hotel-res.svc.cluster.local:5000 -R <reqs-per-sec>
 ```
 
 ##### Example
 ```bash
-cd /root/DeathStarBench/hotelReservation
+cd /root/DeathStarBench/hotel-reservation-arpc
 ./wrk -D exp -t 2 -c 2 -d 30 -L -s ./wrk2_lua_scripts/mixed-workload_type_1.lua http://frontend.hotel-res.svc.cluster.local:5000 -R 2 
 ```
 
@@ -62,10 +62,3 @@ View Jaeger traces by accessing:
 - `http://<jaeger-ip-address>:<jaeger-port>`  (off cluster)
 - `http://jaeger.hotel-res.svc.cluster.local:6831`  (on cluster)
 
-
-### Tips
-
-- If you are running on-cluster, you can use the following command to copy files off of the client.
-e.g., to copy the results directory from the on-cluster client to the local machine:
-  - `hrclient=$(oc get pod | grep hr-client- | cut -f 1 -d " ")`
-  - `oc cp hotel-res/${hrclient}:/root/DeathStarBench/hotelReservation/openshift/results /tmp`
