@@ -22,9 +22,8 @@ const name = "srv-search"
 
 // Server implments the search service
 type Server struct {
-	hotelClient hotel.GeoClient
-	rateClient  hotel.RateClient
-	geoClient   hotel.GeoClient
+	rateClient hotel.RateClient
+	geoClient  hotel.GeoClient
 
 	Tracer     opentracing.Tracer
 	Port       int

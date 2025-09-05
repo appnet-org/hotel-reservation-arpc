@@ -8,10 +8,6 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: user
   name: user
@@ -24,16 +20,10 @@ spec:
     protocol: UDP
   selector:
     app: user
-status:
-  loadBalancer: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: user
   name: user
@@ -42,21 +32,16 @@ spec:
   selector:
     matchLabels:
       app: user
-  strategy: {}
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
         app: user
     spec:
+      serviceAccountName: hotel-user
       containers:
       - command:
         - ./user
         image: appnetorg/hotel-reservation-arpc:latest
-        serviceAccountName: hotel-user
         imagePullPolicy: Always
         name: hotel-reserv-user
         ports:
@@ -79,10 +64,6 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: search
   name: search
@@ -95,16 +76,10 @@ spec:
     protocol: UDP
   selector:
     app: search
-status:
-  loadBalancer: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: search
   name: search
@@ -113,21 +88,16 @@ spec:
   selector:
     matchLabels:
       app: search
-  strategy: {}
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
         app: search
     spec:
+      serviceAccountName: hotel-search
       containers:
       - command:
         - ./search
         image: appnetorg/hotel-reservation-arpc:latest
-        serviceAccountName: hotel-search
         imagePullPolicy: Always
         name: hotel-reserv-search
         ports:
@@ -139,7 +109,6 @@ spec:
             cpu: 100m
       # nodeName: h2.<node-name>
       restartPolicy: Always
-status: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -151,10 +120,6 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: reservation
   name: reservation
@@ -167,16 +132,10 @@ spec:
     protocol: UDP
   selector:
     app: reservation
-status:
-  loadBalancer: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: reservation
   name: reservation
@@ -185,21 +144,16 @@ spec:
   selector:
     matchLabels:
       app: reservation
-  strategy: {}
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
         app: reservation
     spec:
+      serviceAccountName: hotel-reservation
       containers:
       - command:
         - ./reservation
         image: appnetorg/hotel-reservation-arpc:latest
-        serviceAccountName: hotel-reservation
         imagePullPolicy: Always
         name: hotel-reserv-reservation
         ports:
@@ -211,7 +165,6 @@ spec:
             cpu: 100m
       # nodeName: h4.<node-name>
       restartPolicy: Always
-status: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -223,10 +176,6 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: recommendation
   name: recommendation
@@ -239,16 +188,10 @@ spec:
     protocol: UDP
   selector:
     app: recommendation
-status:
-  loadBalancer: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: recommendation
   name: recommendation
@@ -257,21 +200,16 @@ spec:
   selector:
     matchLabels:
       app: recommendation
-  strategy: {}
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
         app: recommendation
     spec:
+      serviceAccountName: hotel-recommendation
       containers:
       - command:
         - ./recommendation
         image: appnetorg/hotel-reservation-arpc:latest
-        serviceAccountName: hotel-recommendation
         imagePullPolicy: Always
         name: hotel-reserv-recommendation
         ports:
@@ -283,7 +221,6 @@ spec:
             cpu: 100m
       # nodeName: h2.<node-name>
       restartPolicy: Always
-status: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -295,10 +232,6 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: rate
   name: rate
@@ -311,16 +244,10 @@ spec:
     protocol: UDP
   selector:
     app: rate
-status:
-  loadBalancer: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: rate
   name: rate
@@ -329,21 +256,16 @@ spec:
   selector:
     matchLabels:
       app: rate
-  strategy: {}
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
         app: rate
     spec:
+      serviceAccountName: hotel-rate
       containers:
       - command:
         - ./rate
         image: appnetorg/hotel-reservation-arpc:latest
-        serviceAccountName: hotel-rate
         imagePullPolicy: Always
         name: hotel-reserv-rate
         ports:
@@ -355,7 +277,6 @@ spec:
             cpu: 100m
       # nodeName: h3.<node-name>
       restartPolicy: Always
-status: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -367,10 +288,6 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: profile
   name: profile
@@ -383,16 +300,10 @@ spec:
     protocol: UDP
   selector:
     app: profile
-status:
-  loadBalancer: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: profile
   name: profile
@@ -401,21 +312,16 @@ spec:
   selector:
     matchLabels:
       app: profile
-  strategy: {}
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
         app: profile
     spec:
+      serviceAccountName: hotel-profile
       containers:
       - command:
         - ./profile
         image: appnetorg/hotel-reservation-arpc:latest
-        serviceAccountName: hotel-profile
         imagePullPolicy: Always
         name: hotel-reserv-profile
         ports:
@@ -427,7 +333,6 @@ spec:
             cpu: 100m
       # nodeName: h5.<node-name>
       restartPolicy: Always
-status: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -439,10 +344,6 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: geo
   name: geo
@@ -455,16 +356,10 @@ spec:
     protocol: UDP
   selector:
     app: geo
-status:
-  loadBalancer: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: geo
   name: geo
@@ -473,21 +368,16 @@ spec:
   selector:
     matchLabels:
       app: geo
-  strategy: {}
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
         app: geo
     spec:
+      serviceAccountName: hotel-geo
       containers:
       - command:
         - ./geo
         image: appnetorg/hotel-reservation-arpc:latest
-        serviceAccountName: hotel-geo
         imagePullPolicy: Always
         name: hotel-reserv-geo
         ports:
@@ -499,7 +389,6 @@ spec:
             cpu: 100m
       # nodeName: h3.<node-name>
       restartPolicy: Always
-status: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -511,10 +400,6 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: frontend
   name: frontend
@@ -526,16 +411,10 @@ spec:
     targetPort: 5000
   selector:
     app: frontend
-status:
-  loadBalancer: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
     app: frontend
   name: frontend
@@ -544,21 +423,16 @@ spec:
   selector:
     matchLabels:
       app: frontend
-  strategy: {}
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
         app: frontend
     spec:
+      serviceAccountName: hotel-frontend
       containers:
       - command:
         - ./frontend
         image: appnetorg/hotel-reservation-arpc:latest
-        serviceAccountName: hotel-frontend
         imagePullPolicy: Always
         name: hotel-reserv-frontend
         ports:
@@ -570,17 +444,12 @@ spec:
             cpu: 100m
       # nodeName: h2.<node-name>
       restartPolicy: Always
-status: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-user
+    app: mongodb-user
   name: mongodb-user
 spec:
   ports:
@@ -588,19 +457,13 @@ spec:
     port: 27017
     targetPort: 27017
   selector:
-    io.kompose.service: mongodb-user
-status:
-  loadBalancer: {}
+    app: mongodb-user
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: memcached-reserve
+    app: memcached-reserve
   name: memcached-reserve
 spec:
   ports:
@@ -608,19 +471,13 @@ spec:
     port: 11211
     targetPort: 11211
   selector:
-    io.kompose.service: memcached-reserve
-status:
-  loadBalancer: {}
+    app: memcached-reserve
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-reservation
+    app: mongodb-reservation
   name: mongodb-reservation
 spec:
   ports:
@@ -628,19 +485,13 @@ spec:
     port: 27017
     targetPort: 27017
   selector:
-    io.kompose.service: mongodb-reservation
-status:
-  loadBalancer: {}
+    app: mongodb-reservation
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-recommendation
+    app: mongodb-recommendation
   name: mongodb-recommendation
 spec:
   ports:
@@ -648,19 +499,13 @@ spec:
     port: 27017
     targetPort: 27017
   selector:
-    io.kompose.service: mongodb-recommendation
-status:
-  loadBalancer: {}
+    app: mongodb-recommendation
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: memcached-rate
+    app: memcached-rate
   name: memcached-rate
 spec:
   ports:
@@ -668,19 +513,13 @@ spec:
     port: 11211
     targetPort: 11211
   selector:
-    io.kompose.service: memcached-rate
-status:
-  loadBalancer: {}
+    app: memcached-rate
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-rate
+    app: mongodb-rate
   name: mongodb-rate
 spec:
   ports:
@@ -688,19 +527,13 @@ spec:
     port: 27017
     targetPort: 27017
   selector:
-    io.kompose.service: mongodb-rate
-status:
-  loadBalancer: {}
+    app: mongodb-rate
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: memcached-profile
+    app: memcached-profile
   name: memcached-profile
 spec:
   ports:
@@ -708,19 +541,13 @@ spec:
     port: 11211
     targetPort: 11211
   selector:
-    io.kompose.service: memcached-profile
-status:
-  loadBalancer: {}
+    app: memcached-profile
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-profile
+    app: mongodb-profile
   name: mongodb-profile
 spec:
   ports:
@@ -728,19 +555,13 @@ spec:
     port: 27017
     targetPort: 27017
   selector:
-    io.kompose.service: mongodb-profile
-status:
-  loadBalancer: {}
+    app: mongodb-profile
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-geo
+    app: mongodb-geo
   name: mongodb-geo
 spec:
   ports:
@@ -748,35 +569,25 @@ spec:
     port: 27017
     targetPort: 27017
   selector:
-    io.kompose.service: mongodb-geo
-status:
-  loadBalancer: {}
+    app: mongodb-geo
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-user
+    app: mongodb-user
   name: mongodb-user
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: mongodb-user
+      app: mongodb-user
   strategy:
     type: Recreate
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
-        io.kompose.service: mongodb-user
+        app: mongodb-user
     spec:
       containers:
       - image: mongo:4.4.6
@@ -798,32 +609,22 @@ spec:
       - name: user
         persistentVolumeClaim:
           claimName: user-pvc
-status: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: memcached-reserve
+    app: memcached-reserve
   name: memcached-reserve
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: memcached-reserve
-  strategy: {}
+      app: memcached-reserve
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
-        io.kompose.service: memcached-reserve
+        app: memcached-reserve
     spec:
       containers:
       - env:
@@ -842,33 +643,24 @@ spec:
             cpu: 100m
       # nodeName: h4.<node-name>
       restartPolicy: Always
-status: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-reservation
+    app: mongodb-reservation
   name: mongodb-reservation
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: mongodb-reservation
+      app: mongodb-reservation
   strategy:
     type: Recreate
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
-        io.kompose.service: mongodb-reservation
+        app: mongodb-reservation
     spec:
       containers:
       - image: mongo:4.4.6
@@ -890,33 +682,24 @@ spec:
       - name: reservation
         persistentVolumeClaim:
           claimName: reservation-pvc
-status: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-recommendation
+    app: mongodb-recommendation
   name: mongodb-recommendation
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: mongodb-recommendation
+      app: mongodb-recommendation
   strategy:
     type: Recreate
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
-        io.kompose.service: mongodb-recommendation
+        app: mongodb-recommendation
     spec:
       containers:
       - image: mongo:4.4.6
@@ -938,33 +721,24 @@ spec:
       - name: recommendation
         persistentVolumeClaim:
           claimName: recommendation-pvc
-status: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-rate
+    app: mongodb-rate
   name: mongodb-rate
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: mongodb-rate
+      app: mongodb-rate
   strategy:
     type: Recreate
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
-        io.kompose.service: mongodb-rate
+        app: mongodb-rate
     spec:
       containers:
       - image: mongo:4.4.6
@@ -985,32 +759,22 @@ spec:
       - name: rate
         persistentVolumeClaim:
           claimName: rate-pvc
-status: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: memcached-rate
+    app: memcached-rate
   name: memcached-rate
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: memcached-rate
-  strategy: {}
+      app: memcached-rate
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
-        io.kompose.service: memcached-rate
+        app: memcached-rate
     spec:
       containers:
       - env:
@@ -1029,32 +793,22 @@ spec:
             cpu: 100m
       # nodeName: h3.<node-name>
       restartPolicy: Always
-status: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: memcached-profile
+    app: memcached-profile
   name: memcached-profile
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: memcached-profile
-  strategy: {}
+      app: memcached-profile
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
-        io.kompose.service: memcached-profile
+        app: memcached-profile
     spec:
       containers:
       - env:
@@ -1073,33 +827,24 @@ spec:
             cpu: 100m
       # nodeName: h5.<node-name>
       restartPolicy: Always
-status: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-profile
+    app: mongodb-profile
   name: mongodb-profile
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: mongodb-profile
+      app: mongodb-profile
   strategy:
     type: Recreate
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
-        io.kompose.service: mongodb-profile
+        app: mongodb-profile
     spec:
       containers:
       - image: mongo:4.4.6
@@ -1121,33 +866,24 @@ spec:
       - name: profile
         persistentVolumeClaim:
           claimName: profile-pvc
-status: {}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: mongodb-geo
+    app: mongodb-geo
   name: mongodb-geo
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: mongodb-geo
+      app: mongodb-geo
   strategy:
     type: Recreate
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-      creationTimestamp: null
       labels:
-        io.kompose.service: mongodb-geo
+        app: mongodb-geo
     spec:
       containers:
       - image: mongo:4.4.6
@@ -1168,7 +904,6 @@ spec:
       - name: geo
         persistentVolumeClaim:
           claimName: geo-pvc
-status: {}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -1235,7 +970,6 @@ spec:
     requests:
       storage: 1Gi
   storageClassName: recommendation-storage
-
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -1309,28 +1043,20 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: jaeger
+    app: jaeger
   name: jaeger
 spec:
   replicas: 1
   selector:
     matchLabels:
-      io.kompose.service: jaeger
-  strategy: {}
+      app: jaeger
   template:
     metadata:
-      annotations:
-        kompose.cmd: kompose convert
-        kompose.version: 1.22.0 (955b78124)
-        sidecar.istio.io/inject: 'false'
-      creationTimestamp: null
       labels:
-        io.kompose.service: jaeger
+        app: jaeger
+      annotations:
+        sidecar.istio.io/inject: 'false'
     spec:
       containers:
       - image: jaegertracing/all-in-one:latest
@@ -1353,17 +1079,12 @@ spec:
           requests:
             cpu: 100m
       restartPolicy: Always
-status: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  annotations:
-    kompose.cmd: kompose convert
-    kompose.version: 1.22.0 (955b78124)
-  creationTimestamp: null
   labels:
-    io.kompose.service: jaeger
+    app: jaeger
   name: jaeger
 spec:
   ports:
@@ -1395,9 +1116,7 @@ spec:
     protocol: UDP
     targetPort: 6832
   selector:
-    io.kompose.service: jaeger
-status:
-  loadBalancer: {}
+    app: jaeger
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
