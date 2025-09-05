@@ -5,12 +5,13 @@ import (
 	// "encoding/json"
 	"fmt"
 
+	"context"
+
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
-	pb "github.com/appnetorg/hotel-reservation-arpc/services/user/proto"
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
-	"golang.org/x/net/context"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -64,8 +65,8 @@ func (s *Server) Shutdown() {
 }
 
 // CheckUser returns whether the username and password are correct.
-func (s *Server) CheckUser(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
-	res := new(pb.Result)
+func (s *Server) CheckUser(ctx context.Context, req *pb.CheckUserRequest) (*pb.CheckUserResult, context.Context, error) {
+	res := new(pb.CheckUserResult)
 
 	log.Trace().Msg("CheckUser")
 

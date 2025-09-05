@@ -10,21 +10,21 @@ import (
 	// "os"
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
+	hotel "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 
-	geo "github.com/appnetorg/hotel-reservation-arpc/services/geo/proto"
-	rate "github.com/appnetorg/hotel-reservation-arpc/services/rate/proto"
-	pb "github.com/appnetorg/hotel-reservation-arpc/services/search/proto"
+	"context"
+
 	"github.com/google/uuid"
 	opentracing "github.com/opentracing/opentracing-go"
-	context "golang.org/x/net/context"
 )
 
 const name = "srv-search"
 
 // Server implments the search service
 type Server struct {
-	geoClient  geo.GeoClient
-	rateClient rate.RateClient
+	hotelClient hotel.GeoClient
+	rateClient  hotel.RateClient
+	geoClient   hotel.GeoClient
 
 	Tracer     opentracing.Tracer
 	Port       int
@@ -50,7 +50,7 @@ func (s *Server) Run() error {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	pb.RegisterSearchServer(server, &Server{})
+	hotel.RegisterSearchServer(server, &Server{})
 
 	server.Start()
 
@@ -77,7 +77,7 @@ func (s *Server) initGeoClient(caller_name, name string) error {
 		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
 
-	s.geoClient = geo.NewGeoClient(client)
+	s.geoClient = hotel.NewGeoClient(client)
 	return nil
 }
 
@@ -89,19 +89,19 @@ func (s *Server) initRateClient(caller_name, name string) error {
 		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
 
-	s.rateClient = rate.NewRateClient(client)
+	s.rateClient = hotel.NewRateClient(client)
 	return nil
 }
 
 // Nearby returns ids of nearby hotels ordered by ranking algo
-func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.SearchResult, context.Context, error) {
+func (s *Server) Nearby(ctx context.Context, req *hotel.SearchRequest) (*hotel.SearchResult, context.Context, error) {
 	// find nearby hotels
 	log.Trace().Msg("Nearby got a message")
 
 	log.Trace().Msgf("nearby lat = %f", req.Lat)
 	log.Trace().Msgf("nearby lon = %f", req.Lon)
 
-	nearby, err := s.geoClient.Nearby(ctx, &geo.Request{
+	nearby, err := s.geoClient.Nearby(ctx, &hotel.NearbyRequest{
 		Lat:       req.Lat,
 		Lon:       req.Lon,
 		Latstring: fmt.Sprintf("%f", req.Lat),
@@ -115,7 +115,7 @@ func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.SearchR
 	}
 
 	// find rates for hotels
-	rates, err := s.rateClient.GetRates(ctx, &rate.Request{
+	rates, err := s.rateClient.GetRates(ctx, &hotel.GetRatesRequest{
 		HotelIds: nearby.HotelIds,
 		InDate:   req.InDate,
 		OutDate:  req.OutDate,
@@ -130,9 +130,11 @@ func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.SearchR
 	// * reviews
 
 	// build the response
-	res := new(pb.SearchResult)
-
-	res.HotelIds = append(res.HotelIds, rates.HotelId)
+	res := new(hotel.SearchResult)
+	for _, ratePlan := range rates.RatePlans {
+		// log.Trace().Msgf("gået RatePlan HotelId = %s, Code = %s", ratePlan.HotelId, ratePlan.Code)
+		res.HotelIds = append(res.HotelIds, ratePlan.HotelId)
+	}
 
 	return res, ctx, nil
 }

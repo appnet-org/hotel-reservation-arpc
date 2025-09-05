@@ -4,12 +4,13 @@ import (
 	// "encoding/json"
 	"fmt"
 
-	pb "github.com/appnetorg/hotel-reservation-arpc/services/recommendation/proto"
+	"context"
+
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/google/uuid"
 	"github.com/hailocab/go-geoindex"
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/net/context"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -65,8 +66,8 @@ func (s *Server) Shutdown() {
 }
 
 // GiveRecommendation returns recommendations within a given requirement.
-func (s *Server) GetRecommendations(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
-	res := new(pb.Result)
+func (s *Server) GetRecommendations(ctx context.Context, req *pb.GetRecommendationsRequest) (*pb.GetRecommendationsResult, context.Context, error) {
+	res := new(pb.GetRecommendationsResult)
 	log.Trace().Msgf("GetRecommendations")
 	require := req.Require
 	if require == "dis" {
@@ -143,7 +144,7 @@ func loadRecommendations(session *mgo.Session) map[string]Hotel {
 	var hotels []Hotel
 	err := c.Find(bson.M{}).All(&hotels)
 	if err != nil {
-		log.Error().Msgf("Failed get hotels data: ", err)
+		log.Error().Msgf("Failed get hotels data: %v", err)
 	}
 
 	profiles := make(map[string]Hotel)

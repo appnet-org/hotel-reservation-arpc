@@ -14,12 +14,13 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"context"
+
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
-	pb "github.com/appnetorg/hotel-reservation-arpc/services/profile/proto"
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
-	"golang.org/x/net/context"
 
 	"github.com/bradfitz/gomemcache/memcache"
 	// "strings"
@@ -68,7 +69,7 @@ func (s *Server) Shutdown() {
 }
 
 // GetProfiles returns hotel profiles for requested IDs
-func (s *Server) GetProfiles(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
+func (s *Server) GetProfiles(ctx context.Context, req *pb.GetProfilesRequest) (*pb.GetProfilesResult, context.Context, error) {
 	// session, err := mgo.Dial("mongodb-profile")
 	// if err != nil {
 	// 	panic(err)
@@ -77,7 +78,8 @@ func (s *Server) GetProfiles(ctx context.Context, req *pb.Request) (*pb.Result, 
 
 	log.Trace().Msgf("In GetProfiles")
 
-	hotels := make([]*pb.Result, 0)
+	res := new(pb.GetProfilesResult)
+	hotels := make([]*pb.Hotel, 0)
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
 
@@ -102,7 +104,7 @@ func (s *Server) GetProfiles(ctx context.Context, req *pb.Request) (*pb.Result, 
 			profileStr := string(item.Value)
 			log.Trace().Msgf("memc hit with %v", profileStr)
 
-			hotelProf := new(pb.Result)
+			hotelProf := new(pb.Hotel)
 			json.Unmarshal(item.Value, hotelProf)
 			hotels = append(hotels, hotelProf)
 			delete(profileMap, hotelId)
@@ -115,7 +117,7 @@ func (s *Server) GetProfiles(ctx context.Context, req *pb.Request) (*pb.Result, 
 				defer session.Close()
 				c := session.DB("profile-db").C("hotels")
 
-				hotelProf := new(pb.Result)
+				hotelProf := new(pb.Hotel)
 				mongoSpan, _ := opentracing.StartSpanFromContext(ctx, "mongo_profile")
 				mongoSpan.SetTag("span.kind", "client")
 				err := c.Find(bson.M{"id": hotelId}).One(&hotelProf)
@@ -143,6 +145,7 @@ func (s *Server) GetProfiles(ctx context.Context, req *pb.Request) (*pb.Result, 
 	}
 	wg.Wait()
 
+	res.Hotels = hotels
 	log.Trace().Msgf("In GetProfiles after getting resp")
-	return hotels[0], ctx, nil
+	return res, ctx, nil
 }

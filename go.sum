@@ -7,8 +7,6 @@ github.com/HdrHistogram/hdrhistogram-go v1.1.2/go.mod h1:yDgFjdqOqDEKOvasDdhWNXY
 github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
 github.com/appnet-org/arpc v0.0.0-20250828000651-f34064e88476 h1:X0OHlehxqiFQKrG0A7C3VPYdfWDYyOBU58PVmRHo0N0=
 github.com/appnet-org/arpc v0.0.0-20250828000651-f34064e88476/go.mod h1:Q0E8j8BVT/wyJDV3mq1n3v0zMPOovKcl8Rth06kV6g4=
-github.com/appnet-org/go-lib/interceptor v0.0.0-20240911194601-9bf18f737cfd h1:uH/qd4RDCTCKzw2tAzao1SEHdadma4TpxA4onHs6cAE=
-github.com/appnet-org/go-lib/interceptor v0.0.0-20240911194601-9bf18f737cfd/go.mod h1:VKseh8GThb/Iic2cVY6FmTZsXmRnfahd4QihGfVfbV4=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da h1:8GUt8eRujhVEGZFFEjBj46YV4rDjvGrNxb0KMWYkL2I=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
@@ -35,8 +33,6 @@ github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/grpc-ecosystem/grpc-opentracing v0.0.0-20171214222146-0e7658f8ee99 h1:bTRV2bQrg85E7ZeeyQfHX3GyfidLrNzVoyq7epx0bTw=
-github.com/grpc-ecosystem/grpc-opentracing v0.0.0-20171214222146-0e7658f8ee99/go.mod h1:6iZfnjpejD4L/4DwD7NryNaJyCQdzwWwH2MWhCA90Kw=
 github.com/hailocab/go-geoindex v0.0.0-20160127134810-64631bfe9711 h1:Oi8hPOZX0gaM2sPVXse2bMpfOjP47a7O61YuB6Z4sGk=
 github.com/hailocab/go-geoindex v0.0.0-20160127134810-64631bfe9711/go.mod h1:+v2qJ3UZe4q2GfgZO4od004F/cMgJbmPSs7dD/ZMUkY=
 github.com/hashicorp/consul v1.0.6 h1:N5444NVNdT/FZddKtLqlYVyY47RmoSrBMxaAdtMgvRc=

@@ -11,13 +11,9 @@ import (
 
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
-	recommendation "github.com/appnetorg/hotel-reservation-arpc/services/recommendation/proto"
-	reservation "github.com/appnetorg/hotel-reservation-arpc/services/reservation/proto"
-	user "github.com/appnetorg/hotel-reservation-arpc/services/user/proto"
+	hotel "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/rs/zerolog/log"
 
-	profile "github.com/appnetorg/hotel-reservation-arpc/services/profile/proto"
-	search "github.com/appnetorg/hotel-reservation-arpc/services/search/proto"
 	"github.com/appnetorg/hotel-reservation-arpc/tls"
 	"github.com/appnetorg/hotel-reservation-arpc/tracing"
 	"github.com/opentracing/opentracing-go"
@@ -25,11 +21,11 @@ import (
 
 // Server implements frontend service
 type Server struct {
-	searchClient         search.SearchClient
-	profileClient        profile.ProfileClient
-	recommendationClient recommendation.RecommendationClient
-	userClient           user.UserClient
-	reservationClient    reservation.ReservationClient
+	searchClient         hotel.SearchClient
+	profileClient        hotel.ProfileClient
+	recommendationClient hotel.RecommendationClient
+	userClient           hotel.UserClient
+	reservationClient    hotel.ReservationClient
 	KnativeDns           string
 	IpAddr               string
 	Port                 int
@@ -97,7 +93,7 @@ func (s *Server) initSearchClient(caller_name, name string) error {
 		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
 
-	s.searchClient = search.NewSearchClient(client)
+	s.searchClient = hotel.NewSearchClient(client)
 	return nil
 }
 
@@ -109,7 +105,7 @@ func (s *Server) initProfileClient(caller_name, name string) error {
 		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
 
-	s.profileClient = profile.NewProfileClient(client)
+	s.profileClient = hotel.NewProfileClient(client)
 	return nil
 }
 
@@ -120,7 +116,7 @@ func (s *Server) initRecommendationClient(caller_name, name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
-	s.recommendationClient = recommendation.NewRecommendationClient(client)
+	s.recommendationClient = hotel.NewRecommendationClient(client)
 	return nil
 }
 
@@ -131,7 +127,7 @@ func (s *Server) initUserClient(caller_name, name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
-	s.userClient = user.NewUserClient(client)
+	s.userClient = hotel.NewUserClient(client)
 	return nil
 }
 
@@ -142,7 +138,7 @@ func (s *Server) initReservation(caller_name, name string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create aRPC client: %v", err)
 	}
-	s.reservationClient = reservation.NewReservationClient(client)
+	s.reservationClient = hotel.NewReservationClient(client)
 	return nil
 }
 
@@ -178,7 +174,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Trace().Msgf("SEARCH [lat: %v, lon: %v, inDate: %v, outDate: %v", lat, lon, inDate, outDate)
 	// search for best hotels
-	searchResp, err := s.searchClient.Nearby(ctx, &search.NearbyRequest{
+	searchResp, err := s.searchClient.Nearby(ctx, &hotel.SearchRequest{
 		Lat:     lat,
 		Lon:     lon,
 		InDate:  inDate,
@@ -200,7 +196,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		locale = "en"
 	}
 
-	reservationResp, err := s.reservationClient.CheckAvailability(ctx, &reservation.Request{
+	reservationResp, err := s.reservationClient.CheckAvailability(ctx, &hotel.ReservationRequest{
 		CustomerName: "",
 		HotelId:      searchResp.HotelIds,
 		InDate:       inDate,
@@ -217,7 +213,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	log.Trace().Msgf("searchHandler gets reserveResp.HotelId = %s", reservationResp.HotelId)
 
 	// hotel profiles
-	profileResp, err := s.profileClient.GetProfiles(ctx, &profile.Request{
+	profileResp, err := s.profileClient.GetProfiles(ctx, &hotel.GetProfilesRequest{
 		HotelIds: reservationResp.HotelId,
 		Locale:   locale,
 	})
@@ -229,7 +225,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Trace().Msg("searchHandler gets profileResp")
 
-	json.NewEncoder(w).Encode(geoJSONResponse(profileResp))
+	json.NewEncoder(w).Encode(geoJSONResponse(profileResp.Hotels))
 }
 
 func (s *Server) recommendHandler(w http.ResponseWriter, r *http.Request) {
@@ -253,7 +249,7 @@ func (s *Server) recommendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// recommend hotels
-	recResp, err := s.recommendationClient.GetRecommendations(ctx, &recommendation.Request{
+	recResp, err := s.recommendationClient.GetRecommendations(ctx, &hotel.GetRecommendationsRequest{
 		Require: require,
 		Lat:     float64(lat),
 		Lon:     float64(lon),
@@ -270,7 +266,7 @@ func (s *Server) recommendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// hotel profiles
-	profileResp, err := s.profileClient.GetProfiles(ctx, &profile.Request{
+	profileResp, err := s.profileClient.GetProfiles(ctx, &hotel.GetProfilesRequest{
 		HotelIds: recResp.HotelIds,
 		Locale:   locale,
 	})
@@ -279,7 +275,7 @@ func (s *Server) recommendHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(geoJSONResponse(profileResp))
+	json.NewEncoder(w).Encode(geoJSONResponse(profileResp.Hotels))
 }
 
 func (s *Server) userHandler(w http.ResponseWriter, r *http.Request) {
@@ -293,7 +289,7 @@ func (s *Server) userHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check username and password
-	recResp, err := s.userClient.CheckUser(ctx, &user.Request{
+	recResp, err := s.userClient.CheckUser(ctx, &hotel.CheckUserRequest{
 		Username: username,
 		Password: password,
 	})
@@ -354,7 +350,7 @@ func (s *Server) reservationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check username and password
-	recResp, err := s.userClient.CheckUser(ctx, &user.Request{
+	recResp, err := s.userClient.CheckUser(ctx, &hotel.CheckUserRequest{
 		Username: username,
 		Password: password,
 	})
@@ -369,7 +365,7 @@ func (s *Server) reservationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Make reservation
-	resResp, err := s.reservationClient.MakeReservation(ctx, &reservation.Request{
+	resResp, err := s.reservationClient.MakeReservation(ctx, &hotel.ReservationRequest{
 		CustomerName: customerName,
 		HotelId:      []string{hotelId},
 		InDate:       inDate,
@@ -393,24 +389,26 @@ func (s *Server) reservationHandler(w http.ResponseWriter, r *http.Request) {
 
 // return a geoJSON response that allows google map to plot points directly on map
 // https://developers.google.com/maps/documentation/javascript/datalayer#sample_geojson
-func geoJSONResponse(hs *profile.Result) map[string]interface{} {
+func geoJSONResponse(hs []*hotel.Hotel) map[string]interface{} {
 	fs := []interface{}{}
 
-	fs = append(fs, map[string]interface{}{
-		"type": "Feature",
-		"id":   hs.Id,
-		"properties": map[string]string{
-			"name":         hs.Name,
-			"phone_number": hs.PhoneNumber,
-		},
-		"geometry": map[string]interface{}{
-			"type": "Point",
-			"coordinates": []float32{
-				hs.Lon,
-				hs.Lat,
+	for _, h := range hs {
+		fs = append(fs, map[string]interface{}{
+			"type": "Feature",
+			"id":   h.Id,
+			"properties": map[string]string{
+				"name":         h.Name,
+				"phone_number": h.PhoneNumber,
 			},
-		},
-	})
+			"geometry": map[string]interface{}{
+				"type": "Point",
+				"coordinates": []float32{
+					h.Address.Lon,
+					h.Address.Lat,
+				},
+			},
+		})
+	}
 
 	return map[string]interface{}{
 		"type":     "FeatureCollection",

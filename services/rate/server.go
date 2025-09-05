@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"context"
+
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -17,10 +19,9 @@ import (
 	"github.com/appnet-org/arpc/pkg/serializer"
 	"github.com/rs/zerolog/log"
 
-	pb "github.com/appnetorg/hotel-reservation-arpc/services/rate/proto"
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
-	"golang.org/x/net/context"
 
 	"strings"
 
@@ -68,7 +69,7 @@ func (s *Server) Shutdown() {
 }
 
 // GetRates gets rates for hotels for specific date range.
-func (s *Server) GetRates(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
+func (s *Server) GetRates(ctx context.Context, req *pb.GetRatesRequest) (*pb.GetRatesResult, context.Context, error) {
 	// res := new(pb.Result)
 	// session, err := mgo.Dial("mongodb-rate")
 	// if err != nil {
@@ -157,22 +158,30 @@ func (s *Server) GetRates(ctx context.Context, req *pb.Request) (*pb.Result, con
 
 	sort.Sort(ratePlans)
 
-	var resultRatePlans []*pb.Result
+	var resultRatePlans []*pb.RatePlan
 	for _, ratePlan := range ratePlans {
-		resultRatePlans = append(resultRatePlans, &pb.Result{
-			HotelId:            ratePlan.HotelId,
-			Code:               ratePlan.Code,
-			InDate:             ratePlan.InDate,
-			OutDate:            ratePlan.OutDate,
-			BookableRate:       ratePlan.RoomType.BookableRate,
-			TotalRate:          ratePlan.RoomType.TotalRate,
-			TotalRateInclusive: ratePlan.RoomType.TotalRateInclusive,
-			Currency:           "USD", // Example, adjust accordingly
-			RoomDescription:    ratePlan.RoomType.RoomDescription,
+		resultRatePlans = append(resultRatePlans, &pb.RatePlan{
+			HotelId: ratePlan.HotelId,
+			Code:    ratePlan.Code,
+			InDate:  ratePlan.InDate,
+			OutDate: ratePlan.OutDate,
+			RoomType: &pb.RoomType{
+				BookableRate:       ratePlan.RoomType.BookableRate,
+				TotalRate:          ratePlan.RoomType.TotalRate,
+				TotalRateInclusive: ratePlan.RoomType.TotalRateInclusive,
+				Code:               ratePlan.RoomType.Code,
+				Currency:           "USD", // Example, adjust accordingly
+				RoomDescription:    ratePlan.RoomType.RoomDescription,
+			},
 		})
 	}
 
-	return resultRatePlans[0], ctx, nil
+	// Construct the result message
+	result := &pb.GetRatesResult{
+		RatePlans: resultRatePlans,
+	}
+
+	return result, ctx, nil
 }
 
 type RoomType struct {

@@ -3,17 +3,10 @@ module github.com/appnetorg/hotel-reservation-arpc
 go 1.23.9
 
 require (
-	github.com/appnet-org/go-lib/interceptor v0.0.0-20240911194601-9bf18f737cfd
-	github.com/appnetorg/hotel-reservation-arpc/services/geo/proto v0.0.0-00010101000000-000000000000
-	github.com/appnetorg/hotel-reservation-arpc/services/profile/proto v0.0.0-00010101000000-000000000000
-	github.com/appnetorg/hotel-reservation-arpc/services/rate/proto v0.0.0-00010101000000-000000000000
-	github.com/appnetorg/hotel-reservation-arpc/services/recommendation/proto v0.0.0-00010101000000-000000000000
-	github.com/appnetorg/hotel-reservation-arpc/services/reservation/proto v0.0.0-00010101000000-000000000000
-	github.com/appnetorg/hotel-reservation-arpc/services/search/proto v0.0.0-00010101000000-000000000000
-	github.com/appnetorg/hotel-reservation-arpc/services/user/proto v0.0.0-00010101000000-000000000000
+	github.com/appnet-org/arpc v0.0.0-20250828000651-f34064e88476
+	github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto v0.0.0-00010101000000-000000000000
 	github.com/bradfitz/gomemcache v0.0.0-20230905024940-24af94b03874
 	github.com/google/uuid v1.6.0
-	github.com/grpc-ecosystem/grpc-opentracing v0.0.0-20171214222146-0e7658f8ee99
 	github.com/hailocab/go-geoindex v0.0.0-20160127134810-64631bfe9711
 	github.com/hashicorp/consul v1.0.6
 	github.com/opentracing-contrib/go-stdlib v0.0.0-20180308002341-f6b9967a3c69
@@ -28,7 +21,6 @@ require (
 require (
 	capnproto.org/go/capnp/v3 v3.1.0-alpha.1 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
-	github.com/appnet-org/arpc v0.0.0-20250828000651-f34064e88476 // indirect
 	github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da // indirect
 	github.com/colega/zeropool v0.0.0-20230505084239-6fb4a4f75381 // indirect
 	github.com/hashicorp/go-cleanhttp v0.0.0-20171218145408-d5fe4b57a186 // indirect
@@ -53,16 +45,4 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
-replace github.com/appnetorg/hotel-reservation-arpc/services/profile/proto => ./proto/profile
-
-replace github.com/appnetorg/hotel-reservation-arpc/services/geo/proto => ./proto/geo
-
-replace github.com/appnetorg/hotel-reservation-arpc/services/rate/proto => ./proto/rate
-
-replace github.com/appnetorg/hotel-reservation-arpc/services/reservation/proto => ./proto/reservation
-
-replace github.com/appnetorg/hotel-reservation-arpc/services/search/proto => ./proto/search
-
-replace github.com/appnetorg/hotel-reservation-arpc/services/recommendation/proto => ./proto/recommendation
-
-replace github.com/appnetorg/hotel-reservation-arpc/services/user/proto => ./proto/user
+replace github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto => ./proto/hotel

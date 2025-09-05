@@ -4,10 +4,11 @@ import (
 	// "encoding/json"
 	"fmt"
 
-	pb "github.com/appnetorg/hotel-reservation-arpc/services/reservation/proto"
+	"context"
+
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
-	"golang.org/x/net/context"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
@@ -67,8 +68,8 @@ func (s *Server) Shutdown() {
 }
 
 // MakeReservation makes a reservation based on given information
-func (s *Server) MakeReservation(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
-	res := new(pb.Result)
+func (s *Server) MakeReservation(ctx context.Context, req *pb.ReservationRequest) (*pb.ReservationResult, context.Context, error) {
+	res := new(pb.ReservationResult)
 	res.HotelId = make([]string, 0)
 
 	// session, err := mgo.Dial("mongodb-reservation")
@@ -191,8 +192,8 @@ func (s *Server) MakeReservation(ctx context.Context, req *pb.Request) (*pb.Resu
 }
 
 // CheckAvailability checks if given information is available
-func (s *Server) CheckAvailability(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
-	res := new(pb.Result)
+func (s *Server) CheckAvailability(ctx context.Context, req *pb.ReservationRequest) (*pb.ReservationResult, context.Context, error) {
+	res := new(pb.ReservationResult)
 	res.HotelId = make([]string, 0)
 
 	// session, err := mgo.Dial("mongodb-reservation")

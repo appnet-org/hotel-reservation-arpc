@@ -7,14 +7,15 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
+	"context"
+
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
-	pb "github.com/appnetorg/hotel-reservation-arpc/services/geo/proto"
+	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/google/uuid"
 	"github.com/hailocab/go-geoindex"
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog/log"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -64,13 +65,13 @@ func (s *Server) Shutdown() {
 }
 
 // Nearby returns all hotels within a given distance.
-func (s *Server) Nearby(ctx context.Context, req *pb.Request) (*pb.Result, context.Context, error) {
+func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.NearbyResult, context.Context, error) {
 	log.Trace().Msgf("In geo Nearby")
 	log.Info().Msgf("In geo getNearbyPoints, lat = %f, lon = %f, latstring = %s", req.Lat, req.Lon, req.Latstring)
 
 	var (
 		points = s.getNearbyPoints(ctx, float64(req.Lat), float64(req.Lon))
-		res    = &pb.Result{}
+		res    = &pb.NearbyResult{}
 	)
 
 	log.Trace().Msgf("geo after getNearbyPoints, len = %d", len(points))
