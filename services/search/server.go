@@ -54,11 +54,11 @@ func (s *Server) Run() error {
 
 	server.Start()
 
-	// init grpc clients
-	if err := s.initGeoClient("search", "geo:8083"); err != nil {
+	// init arpc clients
+	if err := s.initGeoClient("geo.default.svc.cluster.local:8083"); err != nil {
 		return err
 	}
-	if err := s.initRateClient("search", "rate:8084"); err != nil {
+	if err := s.initRateClient("rate.default.svc.cluster.local:8084"); err != nil {
 		return err
 	}
 
@@ -69,7 +69,7 @@ func (s *Server) Run() error {
 func (s *Server) Shutdown() {
 }
 
-func (s *Server) initGeoClient(caller_name, name string) error {
+func (s *Server) initGeoClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
 	client, err := rpc.NewClient(serializer, name, nil)
@@ -81,7 +81,7 @@ func (s *Server) initGeoClient(caller_name, name string) error {
 	return nil
 }
 
-func (s *Server) initRateClient(caller_name, name string) error {
+func (s *Server) initRateClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
 	client, err := rpc.NewClient(serializer, name, nil)

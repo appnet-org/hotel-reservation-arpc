@@ -16,10 +16,12 @@ metadata:
     app: user
   name: user
 spec:
+  clusterIP: None
   ports:
-  - name: grpc-user
+  - name: arpc-user
     port: 8086
     targetPort: 8086
+    protocol: UDP
   selector:
     app: user
 status:
@@ -85,10 +87,12 @@ metadata:
     app: search
   name: search
 spec:
+  clusterIP: None
   ports:
-  - name: grpc-search
+  - name: arpc-search
     port: 8082
     targetPort: 8082
+    protocol: UDP
   selector:
     app: search
 status:
@@ -155,10 +159,12 @@ metadata:
     app: reservation
   name: reservation
 spec:
+  clusterIP: None
   ports:
-  - name: grpc-reservation
+  - name: arpc-reservation
     port: 8087
     targetPort: 8087
+    protocol: UDP
   selector:
     app: reservation
 status:
@@ -225,10 +231,12 @@ metadata:
     app: recommendation
   name: recommendation
 spec:
+  clusterIP: None
   ports:
-  - name: grpc-recommendation
+  - name: arpc-recommendation
     port: 8085
     targetPort: 8085
+    protocol: UDP
   selector:
     app: recommendation
 status:
@@ -295,10 +303,12 @@ metadata:
     app: rate
   name: rate
 spec:
+  clusterIP: None
   ports:
-  - name: grpc-rate
+  - name: arpc-rate
     port: 8084
     targetPort: 8084
+    protocol: UDP
   selector:
     app: rate
 status:
@@ -365,10 +375,12 @@ metadata:
     app: profile
   name: profile
 spec:
+  clusterIP: None
   ports:
-  - name: grpc-profile
+  - name: arpc-profile
     port: 8081
     targetPort: 8081
+    protocol: UDP
   selector:
     app: profile
 status:
@@ -435,10 +447,12 @@ metadata:
     app: geo
   name: geo
 spec:
+  clusterIP: None
   ports:
-  - name: grpc-geo
+  - name: arpc-geo
     port: 8083
     targetPort: 8083
+    protocol: UDP
   selector:
     app: geo
 status:

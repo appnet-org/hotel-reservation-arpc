@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"google.golang.org/grpc/metadata"
+	"github.com/appnet-org/arpc/pkg/metadata"
 
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
 	hotel "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
+	"github.com/appnetorg/hotel-reservation-arpc/tls"
 	"github.com/rs/zerolog/log"
 
-	"github.com/appnetorg/hotel-reservation-arpc/tls"
 	"github.com/appnetorg/hotel-reservation-arpc/tracing"
 	"github.com/opentracing/opentracing-go"
 )
@@ -38,24 +38,24 @@ func (s *Server) Run() error {
 		return fmt.Errorf("Server port must be set")
 	}
 
-	log.Info().Msg("Initializing gRPC clients...")
-	if err := s.initSearchClient("frontend", "search:8082"); err != nil {
+	log.Info().Msg("Initializing aRPC clients...")
+	if err := s.initSearchClient("search.default.svc.cluster.local:8082"); err != nil {
 		return err
 	}
 
-	if err := s.initProfileClient("frontend", "profile:8081"); err != nil {
+	if err := s.initProfileClient("profile.default.svc.cluster.local:8081"); err != nil {
 		return err
 	}
 
-	if err := s.initRecommendationClient("frontend", "recommendation:8085"); err != nil {
+	if err := s.initRecommendationClient("recommendation.default.svc.cluster.local:8085"); err != nil {
 		return err
 	}
 
-	if err := s.initUserClient("frontend", "user:8086"); err != nil {
+	if err := s.initUserClient("user.default.svc.cluster.local:8086"); err != nil {
 		return err
 	}
 
-	if err := s.initReservation("frontend", "reservation:8087"); err != nil {
+	if err := s.initReservation("reservation.default.svc.cluster.local:8087"); err != nil {
 		return err
 	}
 	log.Info().Msg("Successfull")
@@ -85,7 +85,7 @@ func (s *Server) Run() error {
 	}
 }
 
-func (s *Server) initSearchClient(caller_name, name string) error {
+func (s *Server) initSearchClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
 	client, err := rpc.NewClient(serializer, name, nil)
@@ -97,7 +97,7 @@ func (s *Server) initSearchClient(caller_name, name string) error {
 	return nil
 }
 
-func (s *Server) initProfileClient(caller_name, name string) error {
+func (s *Server) initProfileClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
 	client, err := rpc.NewClient(serializer, name, nil)
@@ -109,7 +109,7 @@ func (s *Server) initProfileClient(caller_name, name string) error {
 	return nil
 }
 
-func (s *Server) initRecommendationClient(caller_name, name string) error {
+func (s *Server) initRecommendationClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
 	client, err := rpc.NewClient(serializer, name, nil)
@@ -120,7 +120,7 @@ func (s *Server) initRecommendationClient(caller_name, name string) error {
 	return nil
 }
 
-func (s *Server) initUserClient(caller_name, name string) error {
+func (s *Server) initUserClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
 	client, err := rpc.NewClient(serializer, name, nil)
@@ -131,7 +131,7 @@ func (s *Server) initUserClient(caller_name, name string) error {
 	return nil
 }
 
-func (s *Server) initReservation(caller_name, name string) error {
+func (s *Server) initReservation(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
 	client, err := rpc.NewClient(serializer, name, nil)
