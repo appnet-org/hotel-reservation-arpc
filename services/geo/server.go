@@ -3,6 +3,7 @@ package geo
 import (
 	// "encoding/json"
 	"fmt"
+	"strconv"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -47,13 +48,13 @@ func (s *Server) Run() error {
 	s.uuid = uuid.New().String()
 
 	serializer := &serializer.SymphonySerializer{}
-	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
+	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, nil)
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	pb.RegisterGeoServer(server, &Server{})
+	pb.RegisterGeoServer(server, s)
 
 	server.Start()
 
@@ -66,7 +67,6 @@ func (s *Server) Shutdown() {
 
 // Nearby returns all hotels within a given distance.
 func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.NearbyResult, context.Context, error) {
-	log.Trace().Msgf("In geo Nearby")
 	log.Info().Msgf("In geo getNearbyPoints, lat = %f, lon = %f, latstring = %s", req.Lat, req.Lon, req.Latstring)
 
 	var (

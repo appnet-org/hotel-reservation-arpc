@@ -2,6 +2,8 @@ package user
 
 import (
 	"crypto/sha256"
+	"strconv"
+
 	// "encoding/json"
 	"fmt"
 
@@ -47,13 +49,13 @@ func (s *Server) Run() error {
 	s.uuid = uuid.New().String()
 
 	serializer := &serializer.SymphonySerializer{}
-	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
+	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, nil)
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	pb.RegisterUserServer(server, &Server{})
+	pb.RegisterUserServer(server, s)
 
 	server.Start()
 
@@ -93,7 +95,7 @@ func (s *Server) CheckUser(ctx context.Context, req *pb.CheckUserRequest) (*pb.C
 
 	// res.Correct = user.Password == pass
 
-	log.Trace().Msgf("CheckUser %d", res.Correct)
+	log.Trace().Msgf("CheckUser %t", res.Correct)
 
 	return res, ctx, nil
 }

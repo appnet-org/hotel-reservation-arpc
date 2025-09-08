@@ -50,13 +50,13 @@ func (s *Server) Run() error {
 
 	s.uuid = uuid.New().String()
 	serializer := &serializer.SymphonySerializer{}
-	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
+	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, nil)
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	pb.RegisterReservationServer(server, &Server{})
+	pb.RegisterReservationServer(server, s)
 
 	server.Start()
 

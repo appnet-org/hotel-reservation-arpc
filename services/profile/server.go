@@ -3,6 +3,7 @@ package profile
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -51,13 +52,13 @@ func (s *Server) Run() error {
 	log.Trace().Msgf("in run s.IpAddr = %s, port = %d", s.IpAddr, s.Port)
 
 	serializer := &serializer.SymphonySerializer{}
-	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
+	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, nil)
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	pb.RegisterProfileServer(server, &Server{})
+	pb.RegisterProfileServer(server, s)
 
 	server.Start()
 

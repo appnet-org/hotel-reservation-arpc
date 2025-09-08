@@ -3,6 +3,7 @@ package recommendation
 import (
 	// "encoding/json"
 	"fmt"
+	"strconv"
 
 	"context"
 
@@ -48,13 +49,13 @@ func (s *Server) Run() error {
 	s.uuid = uuid.New().String()
 
 	serializer := &serializer.SymphonySerializer{}
-	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
+	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, nil)
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	pb.RegisterRecommendationServer(server, &Server{})
+	pb.RegisterRecommendationServer(server, s)
 
 	server.Start()
 

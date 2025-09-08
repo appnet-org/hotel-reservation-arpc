@@ -3,6 +3,8 @@ package search
 import (
 	// "encoding/json"
 	"fmt"
+	"strconv"
+
 	// F"io/ioutil"
 
 	"github.com/rs/zerolog/log"
@@ -43,23 +45,23 @@ func (s *Server) Run() error {
 	s.uuid = uuid.New().String()
 
 	serializer := &serializer.SymphonySerializer{}
-	server, err := rpc.NewServer(s.IpAddr, serializer, nil)
+	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, nil)
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
 	}
 
-	hotel.RegisterSearchServer(server, &Server{})
+	hotel.RegisterSearchServer(server, s)
 
-	server.Start()
-
-	// init arpc clients
+	// init arpc clients before starting the server
 	if err := s.initGeoClient("geo.default.svc.cluster.local:8083"); err != nil {
 		return err
 	}
 	if err := s.initRateClient("rate.default.svc.cluster.local:8084"); err != nil {
 		return err
 	}
+
+	server.Start()
 
 	return nil
 }
@@ -73,7 +75,7 @@ func (s *Server) initGeoClient(name string) error {
 
 	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create aRPC client: %v", err)
+		return fmt.Errorf("failed to create geo aRPC client: %v", err)
 	}
 
 	s.geoClient = hotel.NewGeoClient(client)
@@ -85,7 +87,7 @@ func (s *Server) initRateClient(name string) error {
 
 	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create aRPC client: %v", err)
+		return fmt.Errorf("failed to create rate aRPC client: %v", err)
 	}
 
 	s.rateClient = hotel.NewRateClient(client)
@@ -95,10 +97,14 @@ func (s *Server) initRateClient(name string) error {
 // Nearby returns ids of nearby hotels ordered by ranking algo
 func (s *Server) Nearby(ctx context.Context, req *hotel.SearchRequest) (*hotel.SearchResult, context.Context, error) {
 	// find nearby hotels
-	log.Trace().Msg("Nearby got a message")
+	fmt.Println("Nearby got a message!!!")
 
-	log.Trace().Msgf("nearby lat = %f", req.Lat)
-	log.Trace().Msgf("nearby lon = %f", req.Lon)
+	fmt.Printf("nearby lat = %f\n", req.Lat)
+	fmt.Printf("nearby lon = %f\n", req.Lon)
+
+	if s.geoClient == nil {
+		fmt.Println("geo client not initialized")
+	}
 
 	nearby, err := s.geoClient.Nearby(ctx, &hotel.NearbyRequest{
 		Lat:       req.Lat,

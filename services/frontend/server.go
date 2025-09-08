@@ -90,7 +90,7 @@ func (s *Server) initSearchClient(name string) error {
 
 	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create aRPC client: %v", err)
+		return fmt.Errorf("failed to create search aRPC client: %v", err)
 	}
 
 	s.searchClient = hotel.NewSearchClient(client)
@@ -102,7 +102,7 @@ func (s *Server) initProfileClient(name string) error {
 
 	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create aRPC client: %v", err)
+		return fmt.Errorf("failed to create profile aRPC client: %v", err)
 	}
 
 	s.profileClient = hotel.NewProfileClient(client)
@@ -114,7 +114,7 @@ func (s *Server) initRecommendationClient(name string) error {
 
 	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create aRPC client: %v", err)
+		return fmt.Errorf("failed to create recommendation aRPC client: %v", err)
 	}
 	s.recommendationClient = hotel.NewRecommendationClient(client)
 	return nil
@@ -125,7 +125,7 @@ func (s *Server) initUserClient(name string) error {
 
 	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create aRPC client: %v", err)
+		return fmt.Errorf("failed to create user aRPC client: %v", err)
 	}
 	s.userClient = hotel.NewUserClient(client)
 	return nil
@@ -136,7 +136,7 @@ func (s *Server) initReservation(name string) error {
 
 	client, err := rpc.NewClient(serializer, name, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create aRPC client: %v", err)
+		return fmt.Errorf("failed to create reservation aRPC client: %v", err)
 	}
 	s.reservationClient = hotel.NewReservationClient(client)
 	return nil
@@ -149,7 +149,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	md := metadata.New(map[string]string{})
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
 
-	log.Info().Msg("searchHandler Got a request!!")
+	fmt.Println("searchHandler Got a request!!")
 
 	// in/out dates from query params
 	inDate, outDate := r.URL.Query().Get("inDate"), r.URL.Query().Get("outDate")
@@ -172,7 +172,7 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	// log.Trace().log("starts searchHandler querying downstream")
 
-	log.Trace().Msgf("SEARCH [lat: %v, lon: %v, inDate: %v, outDate: %v", lat, lon, inDate, outDate)
+	fmt.Printf("SEARCH [lat: %v, lon: %v, inDate: %v, outDate: %v\n", lat, lon, inDate, outDate)
 	// search for best hotels
 	searchResp, err := s.searchClient.Nearby(ctx, &hotel.SearchRequest{
 		Lat:     lat,
@@ -185,9 +185,9 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Trace().Msg("searchHandler got searchResp")
+	fmt.Println("searchHandler got searchResp")
 	for _, hid := range searchResp.HotelIds {
-		log.Trace().Msgf("Search Handler hotelId = %s", hid)
+		fmt.Printf("Search Handler hotelId = %s\n", hid)
 	}
 
 	// grab locale from query params or default to en
@@ -204,13 +204,13 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		RoomNumber:   1,
 	})
 	if err != nil {
-		log.Error().Msg("SearchHandler CheckAvailability failed")
+		fmt.Println("SearchHandler CheckAvailability failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Trace().Msgf("searchHandler got reserveResp")
-	log.Trace().Msgf("searchHandler gets reserveResp.HotelId = %s", reservationResp.HotelId)
+	fmt.Println("searchHandler got reserveResp")
+	fmt.Printf("searchHandler gets reserveResp.HotelId = %s\n", reservationResp.HotelId)
 
 	// hotel profiles
 	profileResp, err := s.profileClient.GetProfiles(ctx, &hotel.GetProfilesRequest{
@@ -218,12 +218,12 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		Locale:   locale,
 	})
 	if err != nil {
-		log.Error().Msg("SearchHandler GetProfiles failed")
+		fmt.Println("SearchHandler GetProfiles failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	log.Trace().Msg("searchHandler gets profileResp")
+	fmt.Println("searchHandler gets profileResp")
 
 	json.NewEncoder(w).Encode(geoJSONResponse(profileResp.Hotels))
 }
