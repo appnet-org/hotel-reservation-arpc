@@ -114,16 +114,17 @@ func initializeDatabase(url string) *mgo.Session {
 				end_date = end_date + "24"
 			}
 
-			if i%5 == 1 {
+			switch i % 5 {
+			case 1:
 				rate = 120.00
 				rate_inc = 140.00
-			} else if i%5 == 2 {
+			case 2:
 				rate = 124.00
 				rate_inc = 144.00
-			} else if i%5 == 3 {
+			case 3:
 				rate = 132.00
 				rate_inc = 158.00
-			} else if i%5 == 4 {
+			case 4:
 				rate = 232.00
 				rate_inc = 258.00
 			}

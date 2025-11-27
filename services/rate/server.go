@@ -10,8 +10,6 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	// "io/ioutil"
-
 	// "os"
 	"sort"
 	"sync"
@@ -29,7 +27,7 @@ import (
 	"github.com/bradfitz/gomemcache/memcache"
 )
 
-const name = "srv-rate"
+const _ = "srv-rate"
 
 // Server implements the rate service
 type Server struct {
@@ -129,7 +127,7 @@ func (s *Server) GetRates(ctx context.Context, req *pb.GetRatesRequest) (*pb.Get
 				mongoSpan.Finish()
 				log.Trace().Msgf("tmpRatePlans = %v", tmpRatePlans)
 				if err != nil {
-					log.Panic().Msgf("Tried to find hotelId [%v], but got error", id, err.Error())
+					log.Panic().Msgf("Tried to find hotelId [%v], but got error: %s", id, err.Error())
 				} else {
 					for _, r := range tmpRatePlans {
 						log.Trace().Msgf("RatePlan HotelId = %s, Code = %s", r.HotelId, r.Code)

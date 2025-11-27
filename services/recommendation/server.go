@@ -15,16 +15,13 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	// "io/ioutil"
 	"math"
 
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
-	// "os"
-	// "strings"
 )
 
-const name = "srv-recommendation"
+const _ = "srv-recommendation"
 
 // Server implements the recommendation service
 type Server struct {
@@ -71,7 +68,8 @@ func (s *Server) GetRecommendations(ctx context.Context, req *pb.GetRecommendati
 	res := new(pb.GetRecommendationsResult)
 	log.Trace().Msgf("GetRecommendations")
 	require := req.Require
-	if require == "dis" {
+	switch require {
+	case "dis":
 		p1 := &geoindex.GeoPoint{
 			Pid:  "",
 			Plat: req.Lat,
@@ -98,7 +96,7 @@ func (s *Server) GetRecommendations(ctx context.Context, req *pb.GetRecommendati
 				res.HotelIds = append(res.HotelIds, hotel.HId)
 			}
 		}
-	} else if require == "rate" {
+	case "rate":
 		max := 0.0
 		for _, hotel := range s.hotels {
 			if hotel.HRate > max {
@@ -110,7 +108,7 @@ func (s *Server) GetRecommendations(ctx context.Context, req *pb.GetRecommendati
 				res.HotelIds = append(res.HotelIds, hotel.HId)
 			}
 		}
-	} else if require == "price" {
+	case "price":
 		min := math.MaxFloat64
 		for _, hotel := range s.hotels {
 			if hotel.HPrice < min {
@@ -122,7 +120,7 @@ func (s *Server) GetRecommendations(ctx context.Context, req *pb.GetRecommendati
 				res.HotelIds = append(res.HotelIds, hotel.HId)
 			}
 		}
-	} else {
+	default:
 		log.Warn().Msgf("Wrong require parameter: %v", require)
 	}
 

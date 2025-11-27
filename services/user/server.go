@@ -17,13 +17,10 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	// "io/ioutil"
-
 	"github.com/rs/zerolog/log"
-	// "os"
 )
 
-const name = "srv-user"
+const _ = "srv-user"
 
 // Server implements the user service
 type Server struct {
@@ -115,7 +112,7 @@ func loadUsers(session *mgo.Session) map[string]string {
 	var users []User
 	err := c.Find(bson.M{}).All(&users)
 	if err != nil {
-		log.Error().Msgf("Failed get users data: ", err)
+		log.Error().Msgf("Failed get users data: %s", err.Error())
 	}
 
 	res := make(map[string]string)

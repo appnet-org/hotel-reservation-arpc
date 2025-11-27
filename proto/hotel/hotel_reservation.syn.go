@@ -2,17 +2,19 @@
 package hotel_reservation
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
+	math "math"
 )
 
 func (m *NearbyRequest) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 61)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2, 3})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2, 3}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
@@ -22,80 +24,83 @@ func (m *NearbyRequest) MarshalSymphony() ([]byte, error) {
 	offset += 4 // Lon
 
 	// Field 3 (Latstring): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(3))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Latstring
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Latstring)))
+	buf = append(buf, byte(3))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Latstring
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Latstring)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Latstring)
 
 	// === DATA REGION SECTION ===
 
 	// Write fixed field (Lat)
-	binary.Write(&buf, binary.LittleEndian, m.Lat)
+	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lat))
+	buf = append(buf, temp[:4]...)
 
 	// Write fixed field (Lon)
-	binary.Write(&buf, binary.LittleEndian, m.Lon)
+	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lon))
+	buf = append(buf, temp[:4]...)
 
 	// Write string or bytes field (Latstring)
-	buf.Write([]byte(m.Latstring))
+	buf = append(buf, []byte(m.Latstring)...)
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *NearbyRequest) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 4 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 3)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+3]
+	offset += 3
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 5
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 1; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
 		switch fieldNum {
 		case 1: // Lat
 			// Unmarshal fixed field (Lat)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+4]), binary.LittleEndian, &m.Lat); err != nil {
-				return err
+			if dataOffset+4 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 4
+			m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
+			dataOffset += 4
 		case 2: // Lon
 			// Unmarshal fixed field (Lon)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+4]), binary.LittleEndian, &m.Lon); err != nil {
-				return err
+			if dataOffset+4 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 4
+			m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
+			dataOffset += 4
 		case 3: // Latstring
 			// Unmarshal string or []byte field (Latstring)
 			if entry, ok := offsets[3]; ok {
 				m.Latstring = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -104,70 +109,72 @@ func (m *NearbyRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *NearbyResult) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 48)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (HotelIds): repeated variable-length
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of HotelIds
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelIds
+	buf = append(buf, temp[:2]...)
 	totalLen := 0
 	for _, item := range m.HotelIds {
 		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
 	}
-	binary.Write(&buf, binary.LittleEndian, uint16(totalLen))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
+	buf = append(buf, temp[:2]...)
 	offset += totalLen
 
 	// === DATA REGION SECTION ===
 
 	// Write repeated variable-length field (HotelIds)
 	for _, item := range m.HotelIds {
-		binary.Write(&buf, binary.LittleEndian, uint32(len(item)))
-		buf.Write([]byte(item))
+		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
+		buf = append(buf, temp[:4]...)
+		buf = append(buf, []byte(item)...)
 	}
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *NearbyResult) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 2 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 1)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+1]
+	offset += 1
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 5
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 1; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -176,23 +183,26 @@ func (m *NearbyResult) UnmarshalSymphony(data []byte) error {
 			// Unmarshal repeated variable-length field (HotelIds)
 			if entry, ok := offsets[1]; ok {
 				m.HotelIds = make([]string, 0)
-				itemReader := bytes.NewReader(dataRegion[entry.offset : entry.offset+entry.length])
-				for itemReader.Len() > 0 {
-					var itemLen uint32
-					if err := binary.Read(itemReader, binary.LittleEndian, &itemLen); err != nil {
-						return fmt.Errorf("field HotelIds (1): error reading item length: %w", err)
+				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
+				fieldOffset := 0
+				for fieldOffset < len(fieldData) {
+					if fieldOffset+4 > len(fieldData) {
+						return fmt.Errorf("insufficient data for item length")
 					}
+					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
+					fieldOffset += 4
 					if itemLen == 0 {
 						m.HotelIds = append(m.HotelIds, "")
 						continue
 					}
-					itemData := make([]byte, itemLen)
-					if _, err := itemReader.Read(itemData); err != nil {
-						return fmt.Errorf("field HotelIds (1): error reading item data: %w", err)
+					if fieldOffset+int(itemLen) > len(fieldData) {
+						return fmt.Errorf("insufficient data for item data")
 					}
+					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
+					fieldOffset += int(itemLen)
 					m.HotelIds = append(m.HotelIds, string(itemData))
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -201,79 +211,83 @@ func (m *NearbyResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetProfilesRequest) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 96)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (HotelIds): repeated variable-length
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of HotelIds
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelIds
+	buf = append(buf, temp[:2]...)
 	totalLen := 0
 	for _, item := range m.HotelIds {
 		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
 	}
-	binary.Write(&buf, binary.LittleEndian, uint16(totalLen))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
+	buf = append(buf, temp[:2]...)
 	offset += totalLen
 
 	// Field 2 (Locale): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(2))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Locale
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Locale)))
+	buf = append(buf, byte(2))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Locale
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Locale)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Locale)
 
 	// === DATA REGION SECTION ===
 
 	// Write repeated variable-length field (HotelIds)
 	for _, item := range m.HotelIds {
-		binary.Write(&buf, binary.LittleEndian, uint32(len(item)))
-		buf.Write([]byte(item))
+		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
+		buf = append(buf, temp[:4]...)
+		buf = append(buf, []byte(item)...)
 	}
 
 	// Write string or bytes field (Locale)
-	buf.Write([]byte(m.Locale))
+	buf = append(buf, []byte(m.Locale)...)
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *GetProfilesRequest) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 3 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 2)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+2]
+	offset += 2
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 10
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 2; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -282,29 +296,32 @@ func (m *GetProfilesRequest) UnmarshalSymphony(data []byte) error {
 			// Unmarshal repeated variable-length field (HotelIds)
 			if entry, ok := offsets[1]; ok {
 				m.HotelIds = make([]string, 0)
-				itemReader := bytes.NewReader(dataRegion[entry.offset : entry.offset+entry.length])
-				for itemReader.Len() > 0 {
-					var itemLen uint32
-					if err := binary.Read(itemReader, binary.LittleEndian, &itemLen); err != nil {
-						return fmt.Errorf("field HotelIds (1): error reading item length: %w", err)
+				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
+				fieldOffset := 0
+				for fieldOffset < len(fieldData) {
+					if fieldOffset+4 > len(fieldData) {
+						return fmt.Errorf("insufficient data for item length")
 					}
+					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
+					fieldOffset += 4
 					if itemLen == 0 {
 						m.HotelIds = append(m.HotelIds, "")
 						continue
 					}
-					itemData := make([]byte, itemLen)
-					if _, err := itemReader.Read(itemData); err != nil {
-						return fmt.Errorf("field HotelIds (1): error reading item data: %w", err)
+					if fieldOffset+int(itemLen) > len(fieldData) {
+						return fmt.Errorf("insufficient data for item data")
 					}
+					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
+					fieldOffset += int(itemLen)
 					m.HotelIds = append(m.HotelIds, string(itemData))
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 2: // Locale
 			// Unmarshal string or []byte field (Locale)
 			if entry, ok := offsets[2]; ok {
 				m.Locale = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -313,11 +330,13 @@ func (m *GetProfilesRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetProfilesResult) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 88)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1}...)
 
 	// === PRE-MARSHAL/CACHE SECTION FOR NESTED MESSAGES ===
 
@@ -330,7 +349,7 @@ func (m *GetProfilesResult) MarshalSymphony() ([]byte, error) {
 			cachedRepeatedMessages[1][i], err = item.MarshalSymphony()
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to marshal repeated message field Hotels[%d]: %w", i, err)
 		}
 	}
 
@@ -338,60 +357,60 @@ func (m *GetProfilesResult) MarshalSymphony() ([]byte, error) {
 	offset := 0
 
 	// Field 1 (Hotels): nested message
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset))
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset))
+	buf = append(buf, temp[:2]...)
 	totalLen := 0
 	for _, item := range cachedRepeatedMessages[1] {
 		totalLen += 4 + len(item) // 4 bytes for length + message data
 	}
-	binary.Write(&buf, binary.LittleEndian, uint16(totalLen))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
+	buf = append(buf, temp[:2]...)
 	offset += totalLen
 
 	// === DATA REGION SECTION ===
 
 	// Write nested message field (Hotels)
 	for _, item := range cachedRepeatedMessages[1] {
-		binary.Write(&buf, binary.LittleEndian, uint32(len(item)))
-		buf.Write(item)
+		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
+		buf = append(buf, temp[:4]...)
+		buf = append(buf, item...)
 	}
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *GetProfilesResult) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 2 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 1)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+1]
+	offset += 1
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 5
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 1; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -401,27 +420,29 @@ func (m *GetProfilesResult) UnmarshalSymphony(data []byte) error {
 			if entry, ok := offsets[1]; ok {
 				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
 				m.Hotels = make([]*Hotel, 0)
-				itemReader := bytes.NewReader(fieldData)
-				for itemReader.Len() > 0 {
-					var itemLen uint32
-					if err := binary.Read(itemReader, binary.LittleEndian, &itemLen); err != nil {
-						return err
+				fieldOffset := 0
+				for fieldOffset < len(fieldData) {
+					if fieldOffset+4 > len(fieldData) {
+						return fmt.Errorf("insufficient data for item length")
 					}
-					itemBytes := make([]byte, itemLen)
-					if _, err := itemReader.Read(itemBytes); err != nil {
-						return err
-					}
-					newItem := &Hotel{}
+					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
+					fieldOffset += 4
 					if itemLen == 0 {
 						m.Hotels = append(m.Hotels, nil)
 						continue
 					}
+					if fieldOffset+int(itemLen) > len(fieldData) {
+						return fmt.Errorf("insufficient data for item bytes")
+					}
+					itemBytes := fieldData[fieldOffset : fieldOffset+int(itemLen)]
+					fieldOffset += int(itemLen)
+					newItem := &Hotel{}
 					if err := newItem.UnmarshalSymphony(itemBytes); err != nil {
-						return err
+						return fmt.Errorf("failed to unmarshal nested message: %w", err)
 					}
 					m.Hotels = append(m.Hotels, newItem)
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -430,11 +451,13 @@ func (m *GetProfilesResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *Hotel) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 366)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2, 3, 4, 5, 6})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2, 3, 4, 5, 6}...)
 
 	// === PRE-MARSHAL/CACHE SECTION FOR NESTED MESSAGES ===
 
@@ -444,7 +467,7 @@ func (m *Hotel) MarshalSymphony() ([]byte, error) {
 	if m.Address != nil {
 		cachedSingularMessages[5], err = m.Address.MarshalSymphony()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to marshal singular message field Address: %w", err)
 		}
 	}
 
@@ -456,7 +479,7 @@ func (m *Hotel) MarshalSymphony() ([]byte, error) {
 			cachedRepeatedMessages[6][i], err = item.MarshalSymphony()
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to marshal repeated message field Images[%d]: %w", i, err)
 		}
 	}
 
@@ -464,105 +487,115 @@ func (m *Hotel) MarshalSymphony() ([]byte, error) {
 	offset := 0
 
 	// Field 1 (Id): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Id
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Id)))
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Id
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Id)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Id)
 
 	// Field 2 (Name): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(2))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Name
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Name)))
+	buf = append(buf, byte(2))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Name
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Name)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Name)
 
 	// Field 3 (PhoneNumber): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(3))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of PhoneNumber
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.PhoneNumber)))
+	buf = append(buf, byte(3))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of PhoneNumber
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.PhoneNumber)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.PhoneNumber)
 
 	// Field 4 (Description): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(4))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Description
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Description)))
+	buf = append(buf, byte(4))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Description
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Description)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Description)
 
 	// Field 5 (Address): nested message
-	binary.Write(&buf, binary.LittleEndian, byte(5))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset))
-	binary.Write(&buf, binary.LittleEndian, uint16(len(cachedSingularMessages[5])))
+	buf = append(buf, byte(5))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset))
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(cachedSingularMessages[5])))
+	buf = append(buf, temp[:2]...)
 	offset += len(cachedSingularMessages[5])
 
 	// Field 6 (Images): nested message
-	binary.Write(&buf, binary.LittleEndian, byte(6))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset))
+	buf = append(buf, byte(6))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset))
+	buf = append(buf, temp[:2]...)
 	totalLen := 0
 	for _, item := range cachedRepeatedMessages[6] {
 		totalLen += 4 + len(item) // 4 bytes for length + message data
 	}
-	binary.Write(&buf, binary.LittleEndian, uint16(totalLen))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
+	buf = append(buf, temp[:2]...)
 	offset += totalLen
 
 	// === DATA REGION SECTION ===
 
 	// Write string or bytes field (Id)
-	buf.Write([]byte(m.Id))
+	buf = append(buf, []byte(m.Id)...)
 
 	// Write string or bytes field (Name)
-	buf.Write([]byte(m.Name))
+	buf = append(buf, []byte(m.Name)...)
 
 	// Write string or bytes field (PhoneNumber)
-	buf.Write([]byte(m.PhoneNumber))
+	buf = append(buf, []byte(m.PhoneNumber)...)
 
 	// Write string or bytes field (Description)
-	buf.Write([]byte(m.Description))
+	buf = append(buf, []byte(m.Description)...)
 
 	// Write nested message field (Address)
-	buf.Write(cachedSingularMessages[5])
+	buf = append(buf, cachedSingularMessages[5]...)
 
 	// Write nested message field (Images)
 	for _, item := range cachedRepeatedMessages[6] {
-		binary.Write(&buf, binary.LittleEndian, uint32(len(item)))
-		buf.Write(item)
+		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
+		buf = append(buf, temp[:4]...)
+		buf = append(buf, item...)
 	}
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *Hotel) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 7 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 6)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+6]
+	offset += 6
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 30
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 6; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -571,25 +604,25 @@ func (m *Hotel) UnmarshalSymphony(data []byte) error {
 			// Unmarshal string or []byte field (Id)
 			if entry, ok := offsets[1]; ok {
 				m.Id = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 2: // Name
 			// Unmarshal string or []byte field (Name)
 			if entry, ok := offsets[2]; ok {
 				m.Name = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 3: // PhoneNumber
 			// Unmarshal string or []byte field (PhoneNumber)
 			if entry, ok := offsets[3]; ok {
 				m.PhoneNumber = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 4: // Description
 			// Unmarshal string or []byte field (Description)
 			if entry, ok := offsets[4]; ok {
 				m.Description = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 5: // Address
 			// Unmarshal nested message field (Address)
@@ -602,37 +635,39 @@ func (m *Hotel) UnmarshalSymphony(data []byte) error {
 						m.Address = &Address{}
 					}
 					if err := m.Address.UnmarshalSymphony(fieldData); err != nil {
-						return err
+						return fmt.Errorf("failed to unmarshal singular nested message: %w", err)
 					}
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 6: // Images
 			// Unmarshal nested message field (Images)
 			if entry, ok := offsets[6]; ok {
 				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
 				m.Images = make([]*Image, 0)
-				itemReader := bytes.NewReader(fieldData)
-				for itemReader.Len() > 0 {
-					var itemLen uint32
-					if err := binary.Read(itemReader, binary.LittleEndian, &itemLen); err != nil {
-						return err
+				fieldOffset := 0
+				for fieldOffset < len(fieldData) {
+					if fieldOffset+4 > len(fieldData) {
+						return fmt.Errorf("insufficient data for item length")
 					}
-					itemBytes := make([]byte, itemLen)
-					if _, err := itemReader.Read(itemBytes); err != nil {
-						return err
-					}
-					newItem := &Image{}
+					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
+					fieldOffset += 4
 					if itemLen == 0 {
 						m.Images = append(m.Images, nil)
 						continue
 					}
+					if fieldOffset+int(itemLen) > len(fieldData) {
+						return fmt.Errorf("insufficient data for item bytes")
+					}
+					itemBytes := fieldData[fieldOffset : fieldOffset+int(itemLen)]
+					fieldOffset += int(itemLen)
+					newItem := &Image{}
 					if err := newItem.UnmarshalSymphony(itemBytes); err != nil {
-						return err
+						return fmt.Errorf("failed to unmarshal nested message: %w", err)
 					}
 					m.Images = append(m.Images, newItem)
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -641,49 +676,63 @@ func (m *Hotel) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *Address) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 298)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2, 3, 4, 5, 6, 7, 8})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2, 3, 4, 5, 6, 7, 8}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (StreetNumber): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of StreetNumber
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.StreetNumber)))
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of StreetNumber
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.StreetNumber)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.StreetNumber)
 
 	// Field 2 (StreetName): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(2))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of StreetName
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.StreetName)))
+	buf = append(buf, byte(2))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of StreetName
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.StreetName)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.StreetName)
 
 	// Field 3 (City): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(3))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of City
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.City)))
+	buf = append(buf, byte(3))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of City
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.City)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.City)
 
 	// Field 4 (State): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(4))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of State
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.State)))
+	buf = append(buf, byte(4))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of State
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.State)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.State)
 
 	// Field 5 (Country): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(5))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Country
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Country)))
+	buf = append(buf, byte(5))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Country
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Country)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Country)
 
 	// Field 6 (PostalCode): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(6))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of PostalCode
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.PostalCode)))
+	buf = append(buf, byte(6))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of PostalCode
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.PostalCode)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.PostalCode)
 
 	offset += 4 // Lat
@@ -693,66 +742,65 @@ func (m *Address) MarshalSymphony() ([]byte, error) {
 	// === DATA REGION SECTION ===
 
 	// Write string or bytes field (StreetNumber)
-	buf.Write([]byte(m.StreetNumber))
+	buf = append(buf, []byte(m.StreetNumber)...)
 
 	// Write string or bytes field (StreetName)
-	buf.Write([]byte(m.StreetName))
+	buf = append(buf, []byte(m.StreetName)...)
 
 	// Write string or bytes field (City)
-	buf.Write([]byte(m.City))
+	buf = append(buf, []byte(m.City)...)
 
 	// Write string or bytes field (State)
-	buf.Write([]byte(m.State))
+	buf = append(buf, []byte(m.State)...)
 
 	// Write string or bytes field (Country)
-	buf.Write([]byte(m.Country))
+	buf = append(buf, []byte(m.Country)...)
 
 	// Write string or bytes field (PostalCode)
-	buf.Write([]byte(m.PostalCode))
+	buf = append(buf, []byte(m.PostalCode)...)
 
 	// Write fixed field (Lat)
-	binary.Write(&buf, binary.LittleEndian, m.Lat)
+	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lat))
+	buf = append(buf, temp[:4]...)
 
 	// Write fixed field (Lon)
-	binary.Write(&buf, binary.LittleEndian, m.Lon)
+	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lon))
+	buf = append(buf, temp[:4]...)
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *Address) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 9 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 8)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+8]
+	offset += 8
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 30
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 6; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -761,50 +809,52 @@ func (m *Address) UnmarshalSymphony(data []byte) error {
 			// Unmarshal string or []byte field (StreetNumber)
 			if entry, ok := offsets[1]; ok {
 				m.StreetNumber = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 2: // StreetName
 			// Unmarshal string or []byte field (StreetName)
 			if entry, ok := offsets[2]; ok {
 				m.StreetName = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 3: // City
 			// Unmarshal string or []byte field (City)
 			if entry, ok := offsets[3]; ok {
 				m.City = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 4: // State
 			// Unmarshal string or []byte field (State)
 			if entry, ok := offsets[4]; ok {
 				m.State = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 5: // Country
 			// Unmarshal string or []byte field (Country)
 			if entry, ok := offsets[5]; ok {
 				m.Country = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 6: // PostalCode
 			// Unmarshal string or []byte field (PostalCode)
 			if entry, ok := offsets[6]; ok {
 				m.PostalCode = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 7: // Lat
 			// Unmarshal fixed field (Lat)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+4]), binary.LittleEndian, &m.Lat); err != nil {
-				return err
+			if dataOffset+4 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 4
+			m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
+			dataOffset += 4
 		case 8: // Lon
 			// Unmarshal fixed field (Lon)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+4]), binary.LittleEndian, &m.Lon); err != nil {
-				return err
+			if dataOffset+4 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 4
+			m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
+			dataOffset += 4
 		}
 	}
 
@@ -812,19 +862,23 @@ func (m *Address) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *Image) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 51)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (Url): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Url
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Url)))
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Url
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Url)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Url)
 
 	offset += 1 // Default
@@ -832,48 +886,49 @@ func (m *Image) MarshalSymphony() ([]byte, error) {
 	// === DATA REGION SECTION ===
 
 	// Write string or bytes field (Url)
-	buf.Write([]byte(m.Url))
+	buf = append(buf, []byte(m.Url)...)
 
 	// Write fixed field (Default)
-	binary.Write(&buf, binary.LittleEndian, m.Default)
+	if m.Default {
+		buf = append(buf, 1)
+	} else {
+		buf = append(buf, 0)
+	}
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *Image) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 3 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 2)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+2]
+	offset += 2
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 5
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 1; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -882,14 +937,15 @@ func (m *Image) UnmarshalSymphony(data []byte) error {
 			// Unmarshal string or []byte field (Url)
 			if entry, ok := offsets[1]; ok {
 				m.Url = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 2: // Default
 			// Unmarshal fixed field (Default)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+1]), binary.LittleEndian, &m.Default); err != nil {
-				return err
+			if dataOffset+1 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 1
+			m.Default = dataRegion[dataOffset] != 0
+			dataOffset += 1
 		}
 	}
 
@@ -897,19 +953,23 @@ func (m *Image) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetRecommendationsRequest) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 71)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2, 3})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2, 3}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (Require): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Require
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Require)))
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Require
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Require)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Require)
 
 	offset += 8 // Lat
@@ -919,51 +979,50 @@ func (m *GetRecommendationsRequest) MarshalSymphony() ([]byte, error) {
 	// === DATA REGION SECTION ===
 
 	// Write string or bytes field (Require)
-	buf.Write([]byte(m.Require))
+	buf = append(buf, []byte(m.Require)...)
 
 	// Write fixed field (Lat)
-	binary.Write(&buf, binary.LittleEndian, m.Lat)
+	binary.LittleEndian.PutUint64(temp[:8], math.Float64bits(m.Lat))
+	buf = append(buf, temp[:8]...)
 
 	// Write fixed field (Lon)
-	binary.Write(&buf, binary.LittleEndian, m.Lon)
+	binary.LittleEndian.PutUint64(temp[:8], math.Float64bits(m.Lon))
+	buf = append(buf, temp[:8]...)
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *GetRecommendationsRequest) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 4 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 3)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+3]
+	offset += 3
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 5
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 1; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -972,20 +1031,22 @@ func (m *GetRecommendationsRequest) UnmarshalSymphony(data []byte) error {
 			// Unmarshal string or []byte field (Require)
 			if entry, ok := offsets[1]; ok {
 				m.Require = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 2: // Lat
 			// Unmarshal fixed field (Lat)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+8]), binary.LittleEndian, &m.Lat); err != nil {
-				return err
+			if dataOffset+8 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 8
+			m.Lat = math.Float64frombits(binary.LittleEndian.Uint64(dataRegion[dataOffset : dataOffset+8]))
+			dataOffset += 8
 		case 3: // Lon
 			// Unmarshal fixed field (Lon)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+8]), binary.LittleEndian, &m.Lon); err != nil {
-				return err
+			if dataOffset+8 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 8
+			m.Lon = math.Float64frombits(binary.LittleEndian.Uint64(dataRegion[dataOffset : dataOffset+8]))
+			dataOffset += 8
 		}
 	}
 
@@ -993,70 +1054,72 @@ func (m *GetRecommendationsRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetRecommendationsResult) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 48)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (HotelIds): repeated variable-length
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of HotelIds
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelIds
+	buf = append(buf, temp[:2]...)
 	totalLen := 0
 	for _, item := range m.HotelIds {
 		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
 	}
-	binary.Write(&buf, binary.LittleEndian, uint16(totalLen))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
+	buf = append(buf, temp[:2]...)
 	offset += totalLen
 
 	// === DATA REGION SECTION ===
 
 	// Write repeated variable-length field (HotelIds)
 	for _, item := range m.HotelIds {
-		binary.Write(&buf, binary.LittleEndian, uint32(len(item)))
-		buf.Write([]byte(item))
+		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
+		buf = append(buf, temp[:4]...)
+		buf = append(buf, []byte(item)...)
 	}
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *GetRecommendationsResult) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 2 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 1)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+1]
+	offset += 1
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 5
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 1; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -1065,23 +1128,26 @@ func (m *GetRecommendationsResult) UnmarshalSymphony(data []byte) error {
 			// Unmarshal repeated variable-length field (HotelIds)
 			if entry, ok := offsets[1]; ok {
 				m.HotelIds = make([]string, 0)
-				itemReader := bytes.NewReader(dataRegion[entry.offset : entry.offset+entry.length])
-				for itemReader.Len() > 0 {
-					var itemLen uint32
-					if err := binary.Read(itemReader, binary.LittleEndian, &itemLen); err != nil {
-						return fmt.Errorf("field HotelIds (1): error reading item length: %w", err)
+				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
+				fieldOffset := 0
+				for fieldOffset < len(fieldData) {
+					if fieldOffset+4 > len(fieldData) {
+						return fmt.Errorf("insufficient data for item length")
 					}
+					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
+					fieldOffset += 4
 					if itemLen == 0 {
 						m.HotelIds = append(m.HotelIds, "")
 						continue
 					}
-					itemData := make([]byte, itemLen)
-					if _, err := itemReader.Read(itemData); err != nil {
-						return fmt.Errorf("field HotelIds (1): error reading item data: %w", err)
+					if fieldOffset+int(itemLen) > len(fieldData) {
+						return fmt.Errorf("insufficient data for item data")
 					}
+					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
+					fieldOffset += int(itemLen)
 					m.HotelIds = append(m.HotelIds, string(itemData))
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -1090,88 +1156,94 @@ func (m *GetRecommendationsResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetRatesRequest) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 143)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2, 3})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2, 3}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (HotelIds): repeated variable-length
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of HotelIds
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelIds
+	buf = append(buf, temp[:2]...)
 	totalLen := 0
 	for _, item := range m.HotelIds {
 		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
 	}
-	binary.Write(&buf, binary.LittleEndian, uint16(totalLen))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
+	buf = append(buf, temp[:2]...)
 	offset += totalLen
 
 	// Field 2 (InDate): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(2))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of InDate
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.InDate)))
+	buf = append(buf, byte(2))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of InDate
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.InDate)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.InDate)
 
 	// Field 3 (OutDate): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(3))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of OutDate
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.OutDate)))
+	buf = append(buf, byte(3))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of OutDate
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.OutDate)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.OutDate)
 
 	// === DATA REGION SECTION ===
 
 	// Write repeated variable-length field (HotelIds)
 	for _, item := range m.HotelIds {
-		binary.Write(&buf, binary.LittleEndian, uint32(len(item)))
-		buf.Write([]byte(item))
+		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
+		buf = append(buf, temp[:4]...)
+		buf = append(buf, []byte(item)...)
 	}
 
 	// Write string or bytes field (InDate)
-	buf.Write([]byte(m.InDate))
+	buf = append(buf, []byte(m.InDate)...)
 
 	// Write string or bytes field (OutDate)
-	buf.Write([]byte(m.OutDate))
+	buf = append(buf, []byte(m.OutDate)...)
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *GetRatesRequest) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 4 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 3)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+3]
+	offset += 3
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 15
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 3; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -1180,35 +1252,38 @@ func (m *GetRatesRequest) UnmarshalSymphony(data []byte) error {
 			// Unmarshal repeated variable-length field (HotelIds)
 			if entry, ok := offsets[1]; ok {
 				m.HotelIds = make([]string, 0)
-				itemReader := bytes.NewReader(dataRegion[entry.offset : entry.offset+entry.length])
-				for itemReader.Len() > 0 {
-					var itemLen uint32
-					if err := binary.Read(itemReader, binary.LittleEndian, &itemLen); err != nil {
-						return fmt.Errorf("field HotelIds (1): error reading item length: %w", err)
+				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
+				fieldOffset := 0
+				for fieldOffset < len(fieldData) {
+					if fieldOffset+4 > len(fieldData) {
+						return fmt.Errorf("insufficient data for item length")
 					}
+					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
+					fieldOffset += 4
 					if itemLen == 0 {
 						m.HotelIds = append(m.HotelIds, "")
 						continue
 					}
-					itemData := make([]byte, itemLen)
-					if _, err := itemReader.Read(itemData); err != nil {
-						return fmt.Errorf("field HotelIds (1): error reading item data: %w", err)
+					if fieldOffset+int(itemLen) > len(fieldData) {
+						return fmt.Errorf("insufficient data for item data")
 					}
+					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
+					fieldOffset += int(itemLen)
 					m.HotelIds = append(m.HotelIds, string(itemData))
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 2: // InDate
 			// Unmarshal string or []byte field (InDate)
 			if entry, ok := offsets[2]; ok {
 				m.InDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 3: // OutDate
 			// Unmarshal string or []byte field (OutDate)
 			if entry, ok := offsets[3]; ok {
 				m.OutDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -1217,11 +1292,13 @@ func (m *GetRatesRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetRatesResult) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 88)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1}...)
 
 	// === PRE-MARSHAL/CACHE SECTION FOR NESTED MESSAGES ===
 
@@ -1234,7 +1311,7 @@ func (m *GetRatesResult) MarshalSymphony() ([]byte, error) {
 			cachedRepeatedMessages[1][i], err = item.MarshalSymphony()
 		}
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to marshal repeated message field RatePlans[%d]: %w", i, err)
 		}
 	}
 
@@ -1242,60 +1319,60 @@ func (m *GetRatesResult) MarshalSymphony() ([]byte, error) {
 	offset := 0
 
 	// Field 1 (RatePlans): nested message
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset))
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset))
+	buf = append(buf, temp[:2]...)
 	totalLen := 0
 	for _, item := range cachedRepeatedMessages[1] {
 		totalLen += 4 + len(item) // 4 bytes for length + message data
 	}
-	binary.Write(&buf, binary.LittleEndian, uint16(totalLen))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
+	buf = append(buf, temp[:2]...)
 	offset += totalLen
 
 	// === DATA REGION SECTION ===
 
 	// Write nested message field (RatePlans)
 	for _, item := range cachedRepeatedMessages[1] {
-		binary.Write(&buf, binary.LittleEndian, uint32(len(item)))
-		buf.Write(item)
+		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
+		buf = append(buf, temp[:4]...)
+		buf = append(buf, item...)
 	}
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *GetRatesResult) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 2 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 1)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+1]
+	offset += 1
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 5
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 1; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -1305,27 +1382,29 @@ func (m *GetRatesResult) UnmarshalSymphony(data []byte) error {
 			if entry, ok := offsets[1]; ok {
 				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
 				m.RatePlans = make([]*RatePlan, 0)
-				itemReader := bytes.NewReader(fieldData)
-				for itemReader.Len() > 0 {
-					var itemLen uint32
-					if err := binary.Read(itemReader, binary.LittleEndian, &itemLen); err != nil {
-						return err
+				fieldOffset := 0
+				for fieldOffset < len(fieldData) {
+					if fieldOffset+4 > len(fieldData) {
+						return fmt.Errorf("insufficient data for item length")
 					}
-					itemBytes := make([]byte, itemLen)
-					if _, err := itemReader.Read(itemBytes); err != nil {
-						return err
-					}
-					newItem := &RatePlan{}
+					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
+					fieldOffset += 4
 					if itemLen == 0 {
 						m.RatePlans = append(m.RatePlans, nil)
 						continue
 					}
+					if fieldOffset+int(itemLen) > len(fieldData) {
+						return fmt.Errorf("insufficient data for item bytes")
+					}
+					itemBytes := fieldData[fieldOffset : fieldOffset+int(itemLen)]
+					fieldOffset += int(itemLen)
+					newItem := &RatePlan{}
 					if err := newItem.UnmarshalSymphony(itemBytes); err != nil {
-						return err
+						return fmt.Errorf("failed to unmarshal nested message: %w", err)
 					}
 					m.RatePlans = append(m.RatePlans, newItem)
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -1334,11 +1413,13 @@ func (m *GetRatesResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *RatePlan) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 278)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2, 3, 4, 5})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2, 3, 4, 5}...)
 
 	// === PRE-MARSHAL/CACHE SECTION FOR NESTED MESSAGES ===
 
@@ -1348,7 +1429,7 @@ func (m *RatePlan) MarshalSymphony() ([]byte, error) {
 	if m.RoomType != nil {
 		cachedSingularMessages[5], err = m.RoomType.MarshalSymphony()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to marshal singular message field RoomType: %w", err)
 		}
 	}
 
@@ -1356,89 +1437,96 @@ func (m *RatePlan) MarshalSymphony() ([]byte, error) {
 	offset := 0
 
 	// Field 1 (HotelId): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of HotelId
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.HotelId)))
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelId
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.HotelId)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.HotelId)
 
 	// Field 2 (Code): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(2))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Code
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Code)))
+	buf = append(buf, byte(2))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Code
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Code)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Code)
 
 	// Field 3 (InDate): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(3))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of InDate
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.InDate)))
+	buf = append(buf, byte(3))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of InDate
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.InDate)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.InDate)
 
 	// Field 4 (OutDate): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(4))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of OutDate
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.OutDate)))
+	buf = append(buf, byte(4))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of OutDate
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.OutDate)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.OutDate)
 
 	// Field 5 (RoomType): nested message
-	binary.Write(&buf, binary.LittleEndian, byte(5))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset))
-	binary.Write(&buf, binary.LittleEndian, uint16(len(cachedSingularMessages[5])))
+	buf = append(buf, byte(5))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset))
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(cachedSingularMessages[5])))
+	buf = append(buf, temp[:2]...)
 	offset += len(cachedSingularMessages[5])
 
 	// === DATA REGION SECTION ===
 
 	// Write string or bytes field (HotelId)
-	buf.Write([]byte(m.HotelId))
+	buf = append(buf, []byte(m.HotelId)...)
 
 	// Write string or bytes field (Code)
-	buf.Write([]byte(m.Code))
+	buf = append(buf, []byte(m.Code)...)
 
 	// Write string or bytes field (InDate)
-	buf.Write([]byte(m.InDate))
+	buf = append(buf, []byte(m.InDate)...)
 
 	// Write string or bytes field (OutDate)
-	buf.Write([]byte(m.OutDate))
+	buf = append(buf, []byte(m.OutDate)...)
 
 	// Write nested message field (RoomType)
-	buf.Write(cachedSingularMessages[5])
+	buf = append(buf, cachedSingularMessages[5]...)
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *RatePlan) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 6 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 5)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+5]
+	offset += 5
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 25
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 5; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -1447,25 +1535,25 @@ func (m *RatePlan) UnmarshalSymphony(data []byte) error {
 			// Unmarshal string or []byte field (HotelId)
 			if entry, ok := offsets[1]; ok {
 				m.HotelId = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 2: // Code
 			// Unmarshal string or []byte field (Code)
 			if entry, ok := offsets[2]; ok {
 				m.Code = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 3: // InDate
 			// Unmarshal string or []byte field (InDate)
 			if entry, ok := offsets[3]; ok {
 				m.InDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 4: // OutDate
 			// Unmarshal string or []byte field (OutDate)
 			if entry, ok := offsets[4]; ok {
 				m.OutDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 5: // RoomType
 			// Unmarshal nested message field (RoomType)
@@ -1478,10 +1566,10 @@ func (m *RatePlan) UnmarshalSymphony(data []byte) error {
 						m.RoomType = &RoomType{}
 					}
 					if err := m.RoomType.UnmarshalSymphony(fieldData); err != nil {
-						return err
+						return fmt.Errorf("failed to unmarshal singular nested message: %w", err)
 					}
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -1490,11 +1578,13 @@ func (m *RatePlan) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *RoomType) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 177)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2, 3, 4, 5, 6})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2, 3, 4, 5, 6}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
@@ -1506,119 +1596,128 @@ func (m *RoomType) MarshalSymphony() ([]byte, error) {
 	offset += 8 // TotalRateInclusive
 
 	// Field 4 (Code): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(4))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Code
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Code)))
+	buf = append(buf, byte(4))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Code
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Code)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Code)
 
 	// Field 5 (Currency): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(5))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Currency
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Currency)))
+	buf = append(buf, byte(5))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Currency
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Currency)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Currency)
 
 	// Field 6 (RoomDescription): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(6))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of RoomDescription
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.RoomDescription)))
+	buf = append(buf, byte(6))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of RoomDescription
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.RoomDescription)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.RoomDescription)
 
 	// === DATA REGION SECTION ===
 
 	// Write fixed field (BookableRate)
-	binary.Write(&buf, binary.LittleEndian, m.BookableRate)
+	binary.LittleEndian.PutUint64(temp[:8], math.Float64bits(m.BookableRate))
+	buf = append(buf, temp[:8]...)
 
 	// Write fixed field (TotalRate)
-	binary.Write(&buf, binary.LittleEndian, m.TotalRate)
+	binary.LittleEndian.PutUint64(temp[:8], math.Float64bits(m.TotalRate))
+	buf = append(buf, temp[:8]...)
 
 	// Write fixed field (TotalRateInclusive)
-	binary.Write(&buf, binary.LittleEndian, m.TotalRateInclusive)
+	binary.LittleEndian.PutUint64(temp[:8], math.Float64bits(m.TotalRateInclusive))
+	buf = append(buf, temp[:8]...)
 
 	// Write string or bytes field (Code)
-	buf.Write([]byte(m.Code))
+	buf = append(buf, []byte(m.Code)...)
 
 	// Write string or bytes field (Currency)
-	buf.Write([]byte(m.Currency))
+	buf = append(buf, []byte(m.Currency)...)
 
 	// Write string or bytes field (RoomDescription)
-	buf.Write([]byte(m.RoomDescription))
+	buf = append(buf, []byte(m.RoomDescription)...)
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *RoomType) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 7 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 6)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+6]
+	offset += 6
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 15
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 3; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
 		switch fieldNum {
 		case 1: // BookableRate
 			// Unmarshal fixed field (BookableRate)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+8]), binary.LittleEndian, &m.BookableRate); err != nil {
-				return err
+			if dataOffset+8 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 8
+			m.BookableRate = math.Float64frombits(binary.LittleEndian.Uint64(dataRegion[dataOffset : dataOffset+8]))
+			dataOffset += 8
 		case 2: // TotalRate
 			// Unmarshal fixed field (TotalRate)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+8]), binary.LittleEndian, &m.TotalRate); err != nil {
-				return err
+			if dataOffset+8 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 8
+			m.TotalRate = math.Float64frombits(binary.LittleEndian.Uint64(dataRegion[dataOffset : dataOffset+8]))
+			dataOffset += 8
 		case 3: // TotalRateInclusive
 			// Unmarshal fixed field (TotalRateInclusive)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+8]), binary.LittleEndian, &m.TotalRateInclusive); err != nil {
-				return err
+			if dataOffset+8 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 8
+			m.TotalRateInclusive = math.Float64frombits(binary.LittleEndian.Uint64(dataRegion[dataOffset : dataOffset+8]))
+			dataOffset += 8
 		case 4: // Code
 			// Unmarshal string or []byte field (Code)
 			if entry, ok := offsets[4]; ok {
 				m.Code = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 5: // Currency
 			// Unmarshal string or []byte field (Currency)
 			if entry, ok := offsets[5]; ok {
 				m.Currency = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 6: // RoomDescription
 			// Unmarshal string or []byte field (RoomDescription)
 			if entry, ok := offsets[6]; ok {
 				m.RoomDescription = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -1627,41 +1726,51 @@ func (m *RoomType) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *ReservationRequest) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 197)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2, 3, 4, 5})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2, 3, 4, 5}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (CustomerName): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of CustomerName
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.CustomerName)))
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of CustomerName
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.CustomerName)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.CustomerName)
 
 	// Field 2 (HotelId): repeated variable-length
-	binary.Write(&buf, binary.LittleEndian, byte(2))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of HotelId
+	buf = append(buf, byte(2))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelId
+	buf = append(buf, temp[:2]...)
 	totalLen := 0
 	for _, item := range m.HotelId {
 		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
 	}
-	binary.Write(&buf, binary.LittleEndian, uint16(totalLen))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
+	buf = append(buf, temp[:2]...)
 	offset += totalLen
 
 	// Field 3 (InDate): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(3))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of InDate
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.InDate)))
+	buf = append(buf, byte(3))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of InDate
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.InDate)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.InDate)
 
 	// Field 4 (OutDate): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(4))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of OutDate
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.OutDate)))
+	buf = append(buf, byte(4))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of OutDate
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.OutDate)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.OutDate)
 
 	offset += 4 // RoomNumber
@@ -1669,60 +1778,59 @@ func (m *ReservationRequest) MarshalSymphony() ([]byte, error) {
 	// === DATA REGION SECTION ===
 
 	// Write string or bytes field (CustomerName)
-	buf.Write([]byte(m.CustomerName))
+	buf = append(buf, []byte(m.CustomerName)...)
 
 	// Write repeated variable-length field (HotelId)
 	for _, item := range m.HotelId {
-		binary.Write(&buf, binary.LittleEndian, uint32(len(item)))
-		buf.Write([]byte(item))
+		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
+		buf = append(buf, temp[:4]...)
+		buf = append(buf, []byte(item)...)
 	}
 
 	// Write string or bytes field (InDate)
-	buf.Write([]byte(m.InDate))
+	buf = append(buf, []byte(m.InDate)...)
 
 	// Write string or bytes field (OutDate)
-	buf.Write([]byte(m.OutDate))
+	buf = append(buf, []byte(m.OutDate)...)
 
 	// Write fixed field (RoomNumber)
-	binary.Write(&buf, binary.LittleEndian, m.RoomNumber)
+	binary.LittleEndian.PutUint32(temp[:4], uint32(m.RoomNumber))
+	buf = append(buf, temp[:4]...)
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *ReservationRequest) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 6 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 5)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+5]
+	offset += 5
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 20
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 4; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -1731,48 +1839,52 @@ func (m *ReservationRequest) UnmarshalSymphony(data []byte) error {
 			// Unmarshal string or []byte field (CustomerName)
 			if entry, ok := offsets[1]; ok {
 				m.CustomerName = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 2: // HotelId
 			// Unmarshal repeated variable-length field (HotelId)
 			if entry, ok := offsets[2]; ok {
 				m.HotelId = make([]string, 0)
-				itemReader := bytes.NewReader(dataRegion[entry.offset : entry.offset+entry.length])
-				for itemReader.Len() > 0 {
-					var itemLen uint32
-					if err := binary.Read(itemReader, binary.LittleEndian, &itemLen); err != nil {
-						return fmt.Errorf("field HotelId (2): error reading item length: %w", err)
+				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
+				fieldOffset := 0
+				for fieldOffset < len(fieldData) {
+					if fieldOffset+4 > len(fieldData) {
+						return fmt.Errorf("insufficient data for item length")
 					}
+					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
+					fieldOffset += 4
 					if itemLen == 0 {
 						m.HotelId = append(m.HotelId, "")
 						continue
 					}
-					itemData := make([]byte, itemLen)
-					if _, err := itemReader.Read(itemData); err != nil {
-						return fmt.Errorf("field HotelId (2): error reading item data: %w", err)
+					if fieldOffset+int(itemLen) > len(fieldData) {
+						return fmt.Errorf("insufficient data for item data")
 					}
+					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
+					fieldOffset += int(itemLen)
 					m.HotelId = append(m.HotelId, string(itemData))
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 3: // InDate
 			// Unmarshal string or []byte field (InDate)
 			if entry, ok := offsets[3]; ok {
 				m.InDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 4: // OutDate
 			// Unmarshal string or []byte field (OutDate)
 			if entry, ok := offsets[4]; ok {
 				m.OutDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 5: // RoomNumber
 			// Unmarshal fixed field (RoomNumber)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+4]), binary.LittleEndian, &m.RoomNumber); err != nil {
-				return err
+			if dataOffset+4 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 4
+			m.RoomNumber = int32(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
+			dataOffset += 4
 		}
 	}
 
@@ -1780,70 +1892,72 @@ func (m *ReservationRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *ReservationResult) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 48)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (HotelId): repeated variable-length
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of HotelId
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelId
+	buf = append(buf, temp[:2]...)
 	totalLen := 0
 	for _, item := range m.HotelId {
 		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
 	}
-	binary.Write(&buf, binary.LittleEndian, uint16(totalLen))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
+	buf = append(buf, temp[:2]...)
 	offset += totalLen
 
 	// === DATA REGION SECTION ===
 
 	// Write repeated variable-length field (HotelId)
 	for _, item := range m.HotelId {
-		binary.Write(&buf, binary.LittleEndian, uint32(len(item)))
-		buf.Write([]byte(item))
+		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
+		buf = append(buf, temp[:4]...)
+		buf = append(buf, []byte(item)...)
 	}
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *ReservationResult) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 2 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 1)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+1]
+	offset += 1
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 5
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 1; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -1852,23 +1966,26 @@ func (m *ReservationResult) UnmarshalSymphony(data []byte) error {
 			// Unmarshal repeated variable-length field (HotelId)
 			if entry, ok := offsets[1]; ok {
 				m.HotelId = make([]string, 0)
-				itemReader := bytes.NewReader(dataRegion[entry.offset : entry.offset+entry.length])
-				for itemReader.Len() > 0 {
-					var itemLen uint32
-					if err := binary.Read(itemReader, binary.LittleEndian, &itemLen); err != nil {
-						return fmt.Errorf("field HotelId (1): error reading item length: %w", err)
+				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
+				fieldOffset := 0
+				for fieldOffset < len(fieldData) {
+					if fieldOffset+4 > len(fieldData) {
+						return fmt.Errorf("insufficient data for item length")
 					}
+					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
+					fieldOffset += 4
 					if itemLen == 0 {
 						m.HotelId = append(m.HotelId, "")
 						continue
 					}
-					itemData := make([]byte, itemLen)
-					if _, err := itemReader.Read(itemData); err != nil {
-						return fmt.Errorf("field HotelId (1): error reading item data: %w", err)
+					if fieldOffset+int(itemLen) > len(fieldData) {
+						return fmt.Errorf("insufficient data for item data")
 					}
+					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
+					fieldOffset += int(itemLen)
 					m.HotelId = append(m.HotelId, string(itemData))
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -1877,11 +1994,13 @@ func (m *ReservationResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *SearchRequest) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 108)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2, 3, 4})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2, 3, 4}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
@@ -1891,95 +2010,100 @@ func (m *SearchRequest) MarshalSymphony() ([]byte, error) {
 	offset += 4 // Lon
 
 	// Field 3 (InDate): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(3))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of InDate
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.InDate)))
+	buf = append(buf, byte(3))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of InDate
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.InDate)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.InDate)
 
 	// Field 4 (OutDate): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(4))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of OutDate
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.OutDate)))
+	buf = append(buf, byte(4))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of OutDate
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.OutDate)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.OutDate)
 
 	// === DATA REGION SECTION ===
 
 	// Write fixed field (Lat)
-	binary.Write(&buf, binary.LittleEndian, m.Lat)
+	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lat))
+	buf = append(buf, temp[:4]...)
 
 	// Write fixed field (Lon)
-	binary.Write(&buf, binary.LittleEndian, m.Lon)
+	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lon))
+	buf = append(buf, temp[:4]...)
 
 	// Write string or bytes field (InDate)
-	buf.Write([]byte(m.InDate))
+	buf = append(buf, []byte(m.InDate)...)
 
 	// Write string or bytes field (OutDate)
-	buf.Write([]byte(m.OutDate))
+	buf = append(buf, []byte(m.OutDate)...)
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *SearchRequest) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 5 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 4)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+4]
+	offset += 4
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 10
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 2; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
 		switch fieldNum {
 		case 1: // Lat
 			// Unmarshal fixed field (Lat)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+4]), binary.LittleEndian, &m.Lat); err != nil {
-				return err
+			if dataOffset+4 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 4
+			m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
+			dataOffset += 4
 		case 2: // Lon
 			// Unmarshal fixed field (Lon)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+4]), binary.LittleEndian, &m.Lon); err != nil {
-				return err
+			if dataOffset+4 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 4
+			m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
+			dataOffset += 4
 		case 3: // InDate
 			// Unmarshal string or []byte field (InDate)
 			if entry, ok := offsets[3]; ok {
 				m.InDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 4: // OutDate
 			// Unmarshal string or []byte field (OutDate)
 			if entry, ok := offsets[4]; ok {
 				m.OutDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -1988,70 +2112,72 @@ func (m *SearchRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *SearchResult) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 48)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (HotelIds): repeated variable-length
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of HotelIds
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelIds
+	buf = append(buf, temp[:2]...)
 	totalLen := 0
 	for _, item := range m.HotelIds {
 		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
 	}
-	binary.Write(&buf, binary.LittleEndian, uint16(totalLen))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
+	buf = append(buf, temp[:2]...)
 	offset += totalLen
 
 	// === DATA REGION SECTION ===
 
 	// Write repeated variable-length field (HotelIds)
 	for _, item := range m.HotelIds {
-		binary.Write(&buf, binary.LittleEndian, uint32(len(item)))
-		buf.Write([]byte(item))
+		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
+		buf = append(buf, temp[:4]...)
+		buf = append(buf, []byte(item)...)
 	}
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *SearchResult) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 2 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 1)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+1]
+	offset += 1
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 5
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 1; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -2060,23 +2186,26 @@ func (m *SearchResult) UnmarshalSymphony(data []byte) error {
 			// Unmarshal repeated variable-length field (HotelIds)
 			if entry, ok := offsets[1]; ok {
 				m.HotelIds = make([]string, 0)
-				itemReader := bytes.NewReader(dataRegion[entry.offset : entry.offset+entry.length])
-				for itemReader.Len() > 0 {
-					var itemLen uint32
-					if err := binary.Read(itemReader, binary.LittleEndian, &itemLen); err != nil {
-						return fmt.Errorf("field HotelIds (1): error reading item length: %w", err)
+				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
+				fieldOffset := 0
+				for fieldOffset < len(fieldData) {
+					if fieldOffset+4 > len(fieldData) {
+						return fmt.Errorf("insufficient data for item length")
 					}
+					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
+					fieldOffset += 4
 					if itemLen == 0 {
 						m.HotelIds = append(m.HotelIds, "")
 						continue
 					}
-					itemData := make([]byte, itemLen)
-					if _, err := itemReader.Read(itemData); err != nil {
-						return fmt.Errorf("field HotelIds (1): error reading item data: %w", err)
+					if fieldOffset+int(itemLen) > len(fieldData) {
+						return fmt.Errorf("insufficient data for item data")
 					}
+					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
+					fieldOffset += int(itemLen)
 					m.HotelIds = append(m.HotelIds, string(itemData))
 				}
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -2085,72 +2214,75 @@ func (m *SearchResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *CheckUserRequest) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 96)
+	var temp [8]byte // Reusable temp buffer for encoding
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1, 2})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1, 2}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
 
 	// Field 1 (Username): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(1))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Username
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Username)))
+	buf = append(buf, byte(1))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Username
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Username)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Username)
 
 	// Field 2 (Password): string or bytes
-	binary.Write(&buf, binary.LittleEndian, byte(2))
-	binary.Write(&buf, binary.LittleEndian, uint16(offset)) // offset of Password
-	binary.Write(&buf, binary.LittleEndian, uint16(len(m.Password)))
+	buf = append(buf, byte(2))
+	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Password
+	buf = append(buf, temp[:2]...)
+	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Password)))
+	buf = append(buf, temp[:2]...)
 	offset += len(m.Password)
 
 	// === DATA REGION SECTION ===
 
 	// Write string or bytes field (Username)
-	buf.Write([]byte(m.Username))
+	buf = append(buf, []byte(m.Username)...)
 
 	// Write string or bytes field (Password)
-	buf.Write([]byte(m.Password))
+	buf = append(buf, []byte(m.Password)...)
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *CheckUserRequest) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 3 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 2)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+2]
+	offset += 2
 
 	// === OFFSET TABLE PARSING SECTION ===
 	type offsetEntry struct{ offset, length uint16 }
 	offsets := map[byte]offsetEntry{}
+	offsetTableSize := 10
+	if len(data) < offset+offsetTableSize {
+		return fmt.Errorf("data too short for offset table")
+	}
 	for i := 0; i < 2; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
+		entryOffset := offset + i*5
+		fieldID := data[entryOffset]
+		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
+		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
 		offsets[fieldID] = offsetEntry{off, len}
 	}
+	offset += offsetTableSize
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
@@ -2159,13 +2291,13 @@ func (m *CheckUserRequest) UnmarshalSymphony(data []byte) error {
 			// Unmarshal string or []byte field (Username)
 			if entry, ok := offsets[1]; ok {
 				m.Username = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		case 2: // Password
 			// Unmarshal string or []byte field (Password)
 			if entry, ok := offsets[2]; ok {
 				m.Password = string(dataRegion[entry.offset : entry.offset+entry.length])
-				offset += int(entry.length)
+				dataOffset += int(entry.length)
 			}
 		}
 	}
@@ -2174,11 +2306,12 @@ func (m *CheckUserRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *CheckUserResult) MarshalSymphony() ([]byte, error) {
-	var buf bytes.Buffer
+	// Pre-allocate buffer with estimated size
+	buf := make([]byte, 0, 3)
 
 	// === HEADER SECTION ===
-	buf.WriteByte(0x00) // layout header
-	buf.Write([]byte{1})
+	buf = append(buf, 0x00) // layout header
+	buf = append(buf, []byte{1}...)
 
 	// === OFFSET TABLE SECTION ===
 	offset := 0
@@ -2188,55 +2321,43 @@ func (m *CheckUserResult) MarshalSymphony() ([]byte, error) {
 	// === DATA REGION SECTION ===
 
 	// Write fixed field (Correct)
-	binary.Write(&buf, binary.LittleEndian, m.Correct)
+	if m.Correct {
+		buf = append(buf, 1)
+	} else {
+		buf = append(buf, 0)
+	}
 
-	return buf.Bytes(), nil
+	return buf, nil
 }
 
 func (m *CheckUserResult) UnmarshalSymphony(data []byte) error {
 	// === HEADER PARSING SECTION ===
-	reader := bytes.NewReader(data)
-	var header byte
-	if err := binary.Read(reader, binary.LittleEndian, &header); err != nil {
-		return err
+	if len(data) < 2 {
+		return fmt.Errorf("data too short for header")
 	}
+	offset := 0
+	_ = data[offset] // header byte (currently unused)
+	offset++
 
-	fieldOrder := make([]byte, 1)
-	if _, err := reader.Read(fieldOrder); err != nil {
-		return err
-	}
+	fieldOrder := data[offset : offset+1]
+	offset += 1
 
 	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	for i := 0; i < 0; i++ {
-		var fieldID byte
-		var off, len uint16
-		if err := binary.Read(reader, binary.LittleEndian, &fieldID); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &off); err != nil {
-			return err
-		}
-		if err := binary.Read(reader, binary.LittleEndian, &len); err != nil {
-			return err
-		}
-		offsets[fieldID] = offsetEntry{off, len}
-	}
 
 	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[len(data)-reader.Len():]
-	offset := 0
+	dataRegion := data[offset:]
+	dataOffset := 0
 
 	// === FIELD UNMARSHALING SECTION ===
 	for _, fieldNum := range fieldOrder {
 		switch fieldNum {
 		case 1: // Correct
 			// Unmarshal fixed field (Correct)
-			if err := binary.Read(bytes.NewReader(dataRegion[offset:offset+1]), binary.LittleEndian, &m.Correct); err != nil {
-				return err
+			if dataOffset+1 > len(dataRegion) {
+				return fmt.Errorf("insufficient data for fixed field")
 			}
-			offset += 1
+			m.Correct = dataRegion[dataOffset] != 0
+			dataOffset += 1
 		}
 	}
 

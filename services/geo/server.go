@@ -84,7 +84,7 @@ func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.NearbyR
 	return res, ctx, nil
 }
 
-func (s *Server) getNearbyPoints(ctx context.Context, lat, lon float64) []geoindex.Point {
+func (s *Server) getNearbyPoints(_ context.Context, lat, lon float64) []geoindex.Point {
 
 	center := &geoindex.GeoPoint{
 		Pid:  "",

@@ -8,8 +8,6 @@ import (
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
-	// "io/ioutil"
-
 	// "os"
 	"sync"
 
@@ -27,7 +25,7 @@ import (
 	// "strings"
 )
 
-const name = "srv-profile"
+const _ = "srv-profile"
 
 // Server implements the profile service
 type Server struct {

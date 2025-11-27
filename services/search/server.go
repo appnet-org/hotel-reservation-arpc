@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strconv"
 
-	// F"io/ioutil"
-
 	"github.com/rs/zerolog/log"
 
 	// "os"
@@ -20,7 +18,7 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 )
 
-const name = "srv-search"
+const _ = "srv-search"
 
 // Server implments the search service
 type Server struct {

@@ -280,7 +280,10 @@ func (s *Server) recommendHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) userHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	ctx := r.Context()
+	// ctx := r.Context()
+
+	md := metadata.New(map[string]string{})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 
 	username, password := r.URL.Query().Get("username"), r.URL.Query().Get("password")
 	if username == "" || password == "" {
@@ -312,7 +315,10 @@ func (s *Server) userHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) reservationHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	ctx := r.Context()
+	// ctx := r.Context()
+
+	md := metadata.New(map[string]string{})
+	ctx := metadata.NewOutgoingContext(context.Background(), md)
 
 	inDate, outDate := r.URL.Query().Get("inDate"), r.URL.Query().Get("outDate")
 	if inDate == "" || outDate == "" {

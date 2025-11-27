@@ -1,5 +1,5 @@
 # Use the official Golang image as the base image
-FROM golang:1.23.9-bullseye AS builder
+FROM golang:1.24.0 AS builder
 ENV CGO_ENABLED=1
 
 # Set the working directory

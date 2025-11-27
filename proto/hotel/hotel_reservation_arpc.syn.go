@@ -3,7 +3,9 @@ package hotel_reservation
 
 import (
 	"context"
+
 	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/rpc/element"
 )
 
 // GeoClient is the client API for Geo service.
@@ -43,13 +45,29 @@ func RegisterGeoServer(s *rpc.Server, srv GeoServer) {
 		},
 	}, srv)
 }
-func _Geo_Nearby_Handler(srv any, ctx context.Context, dec func(any) error) (any, context.Context, error) {
-	in := new(NearbyRequest)
-	if err := dec(in); err != nil {
+
+func _Geo_Nearby_Handler(srv any, ctx context.Context, dec func(any) error, req *element.RPCRequest, chain *element.RPCElementChain) (*element.RPCResponse, context.Context, error) {
+	req.Payload = new(NearbyRequest)
+	if err := dec(req.Payload); err != nil {
 		return nil, ctx, err
 	}
-	out, newCtx, err := srv.(GeoServer).Nearby(ctx, in)
-	return out, newCtx, err
+	req, ctx, err := chain.ProcessRequest(ctx, req)
+	if err != nil {
+		return nil, ctx, err
+	}
+	result, ctx, err := srv.(GeoServer).Nearby(ctx, req.Payload.(*NearbyRequest))
+	if err != nil {
+		return nil, ctx, err
+	}
+	resp := &element.RPCResponse{
+		ID:     req.ID,
+		Result: result,
+	}
+	resp, ctx, err = chain.ProcessResponse(ctx, resp)
+	if err != nil {
+		return nil, ctx, err
+	}
+	return resp, ctx, err
 }
 
 // ProfileClient is the client API for Profile service.
@@ -89,13 +107,29 @@ func RegisterProfileServer(s *rpc.Server, srv ProfileServer) {
 		},
 	}, srv)
 }
-func _Profile_GetProfiles_Handler(srv any, ctx context.Context, dec func(any) error) (any, context.Context, error) {
-	in := new(GetProfilesRequest)
-	if err := dec(in); err != nil {
+
+func _Profile_GetProfiles_Handler(srv any, ctx context.Context, dec func(any) error, req *element.RPCRequest, chain *element.RPCElementChain) (*element.RPCResponse, context.Context, error) {
+	req.Payload = new(GetProfilesRequest)
+	if err := dec(req.Payload); err != nil {
 		return nil, ctx, err
 	}
-	out, newCtx, err := srv.(ProfileServer).GetProfiles(ctx, in)
-	return out, newCtx, err
+	req, ctx, err := chain.ProcessRequest(ctx, req)
+	if err != nil {
+		return nil, ctx, err
+	}
+	result, ctx, err := srv.(ProfileServer).GetProfiles(ctx, req.Payload.(*GetProfilesRequest))
+	if err != nil {
+		return nil, ctx, err
+	}
+	resp := &element.RPCResponse{
+		ID:     req.ID,
+		Result: result,
+	}
+	resp, ctx, err = chain.ProcessResponse(ctx, resp)
+	if err != nil {
+		return nil, ctx, err
+	}
+	return resp, ctx, err
 }
 
 // RecommendationClient is the client API for Recommendation service.
@@ -135,13 +169,29 @@ func RegisterRecommendationServer(s *rpc.Server, srv RecommendationServer) {
 		},
 	}, srv)
 }
-func _Recommendation_GetRecommendations_Handler(srv any, ctx context.Context, dec func(any) error) (any, context.Context, error) {
-	in := new(GetRecommendationsRequest)
-	if err := dec(in); err != nil {
+
+func _Recommendation_GetRecommendations_Handler(srv any, ctx context.Context, dec func(any) error, req *element.RPCRequest, chain *element.RPCElementChain) (*element.RPCResponse, context.Context, error) {
+	req.Payload = new(GetRecommendationsRequest)
+	if err := dec(req.Payload); err != nil {
 		return nil, ctx, err
 	}
-	out, newCtx, err := srv.(RecommendationServer).GetRecommendations(ctx, in)
-	return out, newCtx, err
+	req, ctx, err := chain.ProcessRequest(ctx, req)
+	if err != nil {
+		return nil, ctx, err
+	}
+	result, ctx, err := srv.(RecommendationServer).GetRecommendations(ctx, req.Payload.(*GetRecommendationsRequest))
+	if err != nil {
+		return nil, ctx, err
+	}
+	resp := &element.RPCResponse{
+		ID:     req.ID,
+		Result: result,
+	}
+	resp, ctx, err = chain.ProcessResponse(ctx, resp)
+	if err != nil {
+		return nil, ctx, err
+	}
+	return resp, ctx, err
 }
 
 // RateClient is the client API for Rate service.
@@ -181,13 +231,29 @@ func RegisterRateServer(s *rpc.Server, srv RateServer) {
 		},
 	}, srv)
 }
-func _Rate_GetRates_Handler(srv any, ctx context.Context, dec func(any) error) (any, context.Context, error) {
-	in := new(GetRatesRequest)
-	if err := dec(in); err != nil {
+
+func _Rate_GetRates_Handler(srv any, ctx context.Context, dec func(any) error, req *element.RPCRequest, chain *element.RPCElementChain) (*element.RPCResponse, context.Context, error) {
+	req.Payload = new(GetRatesRequest)
+	if err := dec(req.Payload); err != nil {
 		return nil, ctx, err
 	}
-	out, newCtx, err := srv.(RateServer).GetRates(ctx, in)
-	return out, newCtx, err
+	req, ctx, err := chain.ProcessRequest(ctx, req)
+	if err != nil {
+		return nil, ctx, err
+	}
+	result, ctx, err := srv.(RateServer).GetRates(ctx, req.Payload.(*GetRatesRequest))
+	if err != nil {
+		return nil, ctx, err
+	}
+	resp := &element.RPCResponse{
+		ID:     req.ID,
+		Result: result,
+	}
+	resp, ctx, err = chain.ProcessResponse(ctx, resp)
+	if err != nil {
+		return nil, ctx, err
+	}
+	return resp, ctx, err
 }
 
 // ReservationClient is the client API for Reservation service.
@@ -241,21 +307,53 @@ func RegisterReservationServer(s *rpc.Server, srv ReservationServer) {
 		},
 	}, srv)
 }
-func _Reservation_MakeReservation_Handler(srv any, ctx context.Context, dec func(any) error) (any, context.Context, error) {
-	in := new(ReservationRequest)
-	if err := dec(in); err != nil {
+
+func _Reservation_MakeReservation_Handler(srv any, ctx context.Context, dec func(any) error, req *element.RPCRequest, chain *element.RPCElementChain) (*element.RPCResponse, context.Context, error) {
+	req.Payload = new(ReservationRequest)
+	if err := dec(req.Payload); err != nil {
 		return nil, ctx, err
 	}
-	out, newCtx, err := srv.(ReservationServer).MakeReservation(ctx, in)
-	return out, newCtx, err
+	req, ctx, err := chain.ProcessRequest(ctx, req)
+	if err != nil {
+		return nil, ctx, err
+	}
+	result, ctx, err := srv.(ReservationServer).MakeReservation(ctx, req.Payload.(*ReservationRequest))
+	if err != nil {
+		return nil, ctx, err
+	}
+	resp := &element.RPCResponse{
+		ID:     req.ID,
+		Result: result,
+	}
+	resp, ctx, err = chain.ProcessResponse(ctx, resp)
+	if err != nil {
+		return nil, ctx, err
+	}
+	return resp, ctx, err
 }
-func _Reservation_CheckAvailability_Handler(srv any, ctx context.Context, dec func(any) error) (any, context.Context, error) {
-	in := new(ReservationRequest)
-	if err := dec(in); err != nil {
+
+func _Reservation_CheckAvailability_Handler(srv any, ctx context.Context, dec func(any) error, req *element.RPCRequest, chain *element.RPCElementChain) (*element.RPCResponse, context.Context, error) {
+	req.Payload = new(ReservationRequest)
+	if err := dec(req.Payload); err != nil {
 		return nil, ctx, err
 	}
-	out, newCtx, err := srv.(ReservationServer).CheckAvailability(ctx, in)
-	return out, newCtx, err
+	req, ctx, err := chain.ProcessRequest(ctx, req)
+	if err != nil {
+		return nil, ctx, err
+	}
+	result, ctx, err := srv.(ReservationServer).CheckAvailability(ctx, req.Payload.(*ReservationRequest))
+	if err != nil {
+		return nil, ctx, err
+	}
+	resp := &element.RPCResponse{
+		ID:     req.ID,
+		Result: result,
+	}
+	resp, ctx, err = chain.ProcessResponse(ctx, resp)
+	if err != nil {
+		return nil, ctx, err
+	}
+	return resp, ctx, err
 }
 
 // SearchClient is the client API for Search service.
@@ -295,13 +393,29 @@ func RegisterSearchServer(s *rpc.Server, srv SearchServer) {
 		},
 	}, srv)
 }
-func _Search_Nearby_Handler(srv any, ctx context.Context, dec func(any) error) (any, context.Context, error) {
-	in := new(SearchRequest)
-	if err := dec(in); err != nil {
+
+func _Search_Nearby_Handler(srv any, ctx context.Context, dec func(any) error, req *element.RPCRequest, chain *element.RPCElementChain) (*element.RPCResponse, context.Context, error) {
+	req.Payload = new(SearchRequest)
+	if err := dec(req.Payload); err != nil {
 		return nil, ctx, err
 	}
-	out, newCtx, err := srv.(SearchServer).Nearby(ctx, in)
-	return out, newCtx, err
+	req, ctx, err := chain.ProcessRequest(ctx, req)
+	if err != nil {
+		return nil, ctx, err
+	}
+	result, ctx, err := srv.(SearchServer).Nearby(ctx, req.Payload.(*SearchRequest))
+	if err != nil {
+		return nil, ctx, err
+	}
+	resp := &element.RPCResponse{
+		ID:     req.ID,
+		Result: result,
+	}
+	resp, ctx, err = chain.ProcessResponse(ctx, resp)
+	if err != nil {
+		return nil, ctx, err
+	}
+	return resp, ctx, err
 }
 
 // UserClient is the client API for User service.
@@ -341,11 +455,27 @@ func RegisterUserServer(s *rpc.Server, srv UserServer) {
 		},
 	}, srv)
 }
-func _User_CheckUser_Handler(srv any, ctx context.Context, dec func(any) error) (any, context.Context, error) {
-	in := new(CheckUserRequest)
-	if err := dec(in); err != nil {
+
+func _User_CheckUser_Handler(srv any, ctx context.Context, dec func(any) error, req *element.RPCRequest, chain *element.RPCElementChain) (*element.RPCResponse, context.Context, error) {
+	req.Payload = new(CheckUserRequest)
+	if err := dec(req.Payload); err != nil {
 		return nil, ctx, err
 	}
-	out, newCtx, err := srv.(UserServer).CheckUser(ctx, in)
-	return out, newCtx, err
+	req, ctx, err := chain.ProcessRequest(ctx, req)
+	if err != nil {
+		return nil, ctx, err
+	}
+	result, ctx, err := srv.(UserServer).CheckUser(ctx, req.Payload.(*CheckUserRequest))
+	if err != nil {
+		return nil, ctx, err
+	}
+	resp := &element.RPCResponse{
+		ID:     req.ID,
+		Result: result,
+	}
+	resp, ctx, err = chain.ProcessResponse(ctx, resp)
+	if err != nil {
+		return nil, ctx, err
+	}
+	return resp, ctx, err
 }

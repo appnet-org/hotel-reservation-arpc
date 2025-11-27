@@ -115,9 +115,10 @@ func initializeDatabase(url string) *mgo.Session {
 			log.Fatal().Msg(err.Error())
 		}
 		room_num := 200
-		if i%3 == 1 {
+		switch i % 3 {
+		case 1:
 			room_num = 300
-		} else if i%3 == 2 {
+		case 2:
 			room_num = 250
 		}
 		if count == 0 {
