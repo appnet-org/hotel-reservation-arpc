@@ -38,23 +38,23 @@ func (s *Server) Run() error {
 		return fmt.Errorf("Server port must be set")
 	}
 
-	if err := s.initSearchClient("search.default.svc.cluster.local:8082"); err != nil {
+	if err := s.initSearchClient("search.default.svc.cluster.local:11002"); err != nil {
 		return err
 	}
 
-	if err := s.initProfileClient("profile.default.svc.cluster.local:8081"); err != nil {
+	if err := s.initProfileClient("profile.default.svc.cluster.local:11001"); err != nil {
 		return err
 	}
 
-	if err := s.initRecommendationClient("recommendation.default.svc.cluster.local:8085"); err != nil {
+	if err := s.initRecommendationClient("recommendation.default.svc.cluster.local:11005"); err != nil {
 		return err
 	}
 
-	if err := s.initUserClient("user.default.svc.cluster.local:8086"); err != nil {
+	if err := s.initUserClient("user.default.svc.cluster.local:11006"); err != nil {
 		return err
 	}
 
-	if err := s.initReservation("reservation.default.svc.cluster.local:8087"); err != nil {
+	if err := s.initReservation("reservation.default.svc.cluster.local:11007"); err != nil {
 		return err
 	}
 

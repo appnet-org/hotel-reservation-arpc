@@ -62,7 +62,6 @@ func main() {
 	log.Info().Msgf("Read target port: %v", serv_port)
 	log.Info().Msgf("Read jaeger address: %v", result["jaegerAddress"])
 	var (
-		// port       = flag.Int("port", 5000, "The server port")
 		jaegeraddr = flag.String("jaegeraddr", result["jaegerAddress"], "Jaeger address")
 	)
 	flag.Parse()

@@ -15,8 +15,8 @@ spec:
   clusterIP: None
   ports:
   - name: arpc-user
-    port: 8086
-    targetPort: 8086
+    port: 11006
+    targetPort: 11006
     protocol: UDP
   selector:
     app: user
@@ -50,7 +50,7 @@ spec:
         - name: LOG_FORMAT
           value: "console"
         ports:
-        - containerPort: 8086
+        - containerPort: 11006
         resources:
           limits:
             cpu: 1000m
@@ -76,8 +76,8 @@ spec:
   clusterIP: None
   ports:
   - name: arpc-search
-    port: 8082
-    targetPort: 8082
+    port: 11002
+    targetPort: 11002
     protocol: UDP
   selector:
     app: search
@@ -111,7 +111,7 @@ spec:
         - name: LOG_FORMAT
           value: "console"
         ports:
-        - containerPort: 8082
+        - containerPort: 11002
         resources:
           limits:
             cpu: 1000m
@@ -137,8 +137,8 @@ spec:
   clusterIP: None
   ports:
   - name: arpc-reservation
-    port: 8087
-    targetPort: 8087
+    port: 11007
+    targetPort: 11007
     protocol: UDP
   selector:
     app: reservation
@@ -172,7 +172,7 @@ spec:
         - name: LOG_FORMAT
           value: "console"
         ports:
-        - containerPort: 8087
+        - containerPort: 11007
         resources:
           limits:
             cpu: 1000m
@@ -198,8 +198,8 @@ spec:
   clusterIP: None
   ports:
   - name: arpc-recommendation
-    port: 8085
-    targetPort: 8085
+    port: 11005
+    targetPort: 11005
     protocol: UDP
   selector:
     app: recommendation
@@ -233,7 +233,7 @@ spec:
         - name: LOG_FORMAT
           value: "console"
         ports:
-        - containerPort: 8085
+        - containerPort: 11005
         resources:
           limits:
             cpu: 1000m
@@ -259,8 +259,8 @@ spec:
   clusterIP: None
   ports:
   - name: arpc-rate
-    port: 8084
-    targetPort: 8084
+    port: 11004
+    targetPort: 11004
     protocol: UDP
   selector:
     app: rate
@@ -294,7 +294,7 @@ spec:
         - name: LOG_FORMAT
           value: "console"
         ports:
-        - containerPort: 8084
+        - containerPort: 11004
         resources:
           limits:
             cpu: 1000m
@@ -320,8 +320,8 @@ spec:
   clusterIP: None
   ports:
   - name: arpc-profile
-    port: 8081
-    targetPort: 8081
+    port: 11001
+    targetPort: 11001
     protocol: UDP
   selector:
     app: profile
@@ -355,7 +355,7 @@ spec:
         - name: LOG_FORMAT
           value: "console"
         ports:
-        - containerPort: 8081
+        - containerPort: 11001
         resources:
           limits:
             cpu: 1000m
@@ -381,8 +381,8 @@ spec:
   clusterIP: None
   ports:
   - name: arpc-geo
-    port: 8083
-    targetPort: 8083
+    port: 11003
+    targetPort: 11003
     protocol: UDP
   selector:
     app: geo
@@ -416,7 +416,7 @@ spec:
         - name: LOG_FORMAT
           value: "console"
         ports:
-        - containerPort: 8083
+        - containerPort: 11003
         resources:
           limits:
             cpu: 1000m
@@ -442,8 +442,8 @@ spec:
   clusterIP: 10.96.88.88
   ports:
   - name: frontend
-    port: 5000
-    targetPort: 5000
+    port: 11000
+    targetPort: 11000
   selector:
     app: frontend
 ---
@@ -476,7 +476,7 @@ spec:
         - name: LOG_FORMAT
           value: "console"
         ports:
-        - containerPort: 5000
+        - containerPort: 11000
         resources:
           limits:
             cpu: 1000m

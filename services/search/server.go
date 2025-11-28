@@ -54,10 +54,10 @@ func (s *Server) Run() error {
 	hotel.RegisterSearchServer(server, s)
 
 	// init arpc clients before starting the server
-	if err := s.initGeoClient("geo.default.svc.cluster.local:8083"); err != nil {
+	if err := s.initGeoClient("geo.default.svc.cluster.local:11003"); err != nil {
 		return err
 	}
-	if err := s.initRateClient("rate.default.svc.cluster.local:8084"); err != nil {
+	if err := s.initRateClient("rate.default.svc.cluster.local:11004"); err != nil {
 		return err
 	}
 
