@@ -3,10 +3,12 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
 
+	"github.com/appnet-org/arpc/pkg/logging"
 	"github.com/appnetorg/hotel-reservation-arpc/services/profile"
 	"github.com/appnetorg/hotel-reservation-arpc/tracing"
 	"github.com/appnetorg/hotel-reservation-arpc/tune"
@@ -16,8 +18,30 @@ import (
 	"time"
 )
 
+// getLoggingConfig reads logging configuration from environment variables with defaults
+func getLoggingConfig() *logging.Config {
+	level := os.Getenv("LOG_LEVEL")
+	if level == "" {
+		level = "info"
+	}
+
+	format := os.Getenv("LOG_FORMAT")
+	if format == "" {
+		format = "console"
+	}
+
+	return &logging.Config{
+		Level:  level,
+		Format: format,
+	}
+}
+
 func main() {
 	tune.Init()
+	err := logging.Init(getLoggingConfig())
+	if err != nil {
+		panic(fmt.Sprintf("Failed to initialize logging: %v", err))
+	}
 	log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339}).With().Timestamp().Caller().Logger()
 
 	log.Info().Msg("Reading config...")

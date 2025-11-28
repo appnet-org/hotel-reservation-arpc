@@ -54,6 +54,7 @@ func (s *Server) Run() error {
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
+		return err
 	}
 
 	pb.RegisterRateServer(server, s)
@@ -88,16 +89,14 @@ func (s *Server) GetRates(ctx context.Context, req *pb.GetRatesRequest) (*pb.Get
 	memSpan, _ := opentracing.StartSpanFromContext(ctx, "memcached_get_multi_rate")
 	memSpan.SetTag("span.kind", "client")
 	resMap, err := s.MemcClient.GetMulti(hotelIds)
-	log.Trace().Msgf("resMap = %v", resMap)
 	memSpan.Finish()
 	var wg sync.WaitGroup
 	var mutex sync.Mutex
 	if err != nil && err != memcache.ErrCacheMiss {
 		log.Panic().Msgf("Memmcached error while trying to get hotel [id: %v]= %s", hotelIds, err)
 	} else {
-		for hotelId, item := range resMap {
-			rateStrs := strings.Split(string(item.Value), "\n")
-			log.Trace().Msgf("memc hit, hotelId = %s,rate strings: %v", hotelId, rateStrs)
+		for _, item := range resMap {
+			_ = strings.Split(string(item.Value), "\n") // unused for now
 
 			// for _, rateStr := range rateStrs {
 			// 	if len(rateStr) != 0 {
@@ -107,14 +106,10 @@ func (s *Server) GetRates(ctx context.Context, req *pb.GetRatesRequest) (*pb.Get
 			// 		ratePlans = append(ratePlans, rateP)
 			// 	}
 			// }
-			// delete(rateMap, hotelId)
 		}
 		wg.Add(len(rateMap))
 		for hotelId := range rateMap {
 			go func(id string) {
-				log.Trace().Msgf("memc miss, hotelId = %s", id)
-				log.Trace().Msg("memcached miss, set up mongo connection")
-
 				// memcached miss, set up mongo connection
 				session := s.MongoSession.Copy()
 				defer session.Close()
@@ -125,13 +120,10 @@ func (s *Server) GetRates(ctx context.Context, req *pb.GetRatesRequest) (*pb.Get
 				mongoSpan.SetTag("span.kind", "client")
 				err := c.Find(&bson.M{"hotelId": id}).All(&tmpRatePlans)
 				mongoSpan.Finish()
-				log.Trace().Msgf("tmpRatePlans = %v", tmpRatePlans)
 				if err != nil {
 					log.Panic().Msgf("Tried to find hotelId [%v], but got error: %s", id, err.Error())
 				} else {
 					for _, r := range tmpRatePlans {
-						log.Trace().Msgf("RatePlan HotelId = %s, Code = %s", r.HotelId, r.Code)
-						log.Trace().Msgf("RatePlan RoomType = %v", r.RoomType)
 						mutex.Lock()
 						ratePlans = append(ratePlans, r)
 						mutex.Unlock()
@@ -149,11 +141,6 @@ func (s *Server) GetRates(ctx context.Context, req *pb.GetRatesRequest) (*pb.Get
 		}
 	}
 	wg.Wait()
-
-	// Printing the ratePlans
-	for _, ratePlan := range ratePlans {
-		log.Trace().Msgf("RatePlan HotelId = %s, Code = %s", ratePlan.HotelId, ratePlan.Code)
-	}
 
 	sort.Sort(ratePlans)
 

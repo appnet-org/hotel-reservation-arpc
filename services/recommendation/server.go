@@ -50,6 +50,7 @@ func (s *Server) Run() error {
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
+		return err
 	}
 
 	pb.RegisterRecommendationServer(server, s)
@@ -66,7 +67,6 @@ func (s *Server) Shutdown() {
 // GiveRecommendation returns recommendations within a given requirement.
 func (s *Server) GetRecommendations(ctx context.Context, req *pb.GetRecommendationsRequest) (*pb.GetRecommendationsResult, context.Context, error) {
 	res := new(pb.GetRecommendationsResult)
-	log.Trace().Msgf("GetRecommendations")
 	require := req.Require
 	switch require {
 	case "dis":

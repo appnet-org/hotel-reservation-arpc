@@ -52,6 +52,7 @@ func (s *Server) Run() error {
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
+		return err
 	}
 
 	pb.RegisterGeoServer(server, s)
@@ -67,17 +68,21 @@ func (s *Server) Shutdown() {
 
 // Nearby returns all hotels within a given distance.
 func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.NearbyResult, context.Context, error) {
-	log.Info().Msgf("In geo getNearbyPoints, lat = %f, lon = %f, latstring = %s", req.Lat, req.Lon, req.Latstring)
+	// Check if index is initialized
+	if s.index == nil {
+		log.Error().Msg("Geo index is nil, initializing now")
+		if s.MongoSession == nil {
+			log.Error().Msg("MongoSession is nil, cannot initialize index")
+			return &pb.NearbyResult{}, ctx, fmt.Errorf("geo index not initialized and MongoSession is nil")
+		}
+		s.index = newGeoIndex(s.MongoSession)
+		log.Info().Msg("Geo index initialized")
+	}
 
-	var (
-		points = s.getNearbyPoints(ctx, float64(req.Lat), float64(req.Lon))
-		res    = &pb.NearbyResult{}
-	)
-
-	log.Trace().Msgf("geo after getNearbyPoints, len = %d", len(points))
+	points := s.getNearbyPoints(ctx, float64(req.Lat), float64(req.Lon))
+	res := &pb.NearbyResult{}
 
 	for _, p := range points {
-		log.Trace().Msgf("In geo Nearby return hotelId = %s", p.Id())
 		res.HotelIds = append(res.HotelIds, p.Id())
 	}
 
@@ -85,6 +90,10 @@ func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.NearbyR
 }
 
 func (s *Server) getNearbyPoints(_ context.Context, lat, lon float64) []geoindex.Point {
+	if s.index == nil {
+		log.Error().Msg("Index is nil in getNearbyPoints")
+		return []geoindex.Point{}
+	}
 
 	center := &geoindex.GeoPoint{
 		Pid:  "",
@@ -92,13 +101,14 @@ func (s *Server) getNearbyPoints(_ context.Context, lat, lon float64) []geoindex
 		Plon: lon,
 	}
 
-	return s.index.KNearest(
+	points := s.index.KNearest(
 		center,
 		maxSearchResults,
 		geoindex.Km(maxSearchRadius), func(p geoindex.Point) bool {
 			return true
 		},
 	)
+	return points
 }
 
 // newGeoIndex returns a geo index with points loaded
@@ -108,8 +118,6 @@ func newGeoIndex(session *mgo.Session) *geoindex.ClusteringIndex {
 	// 	panic(err)
 	// }
 	// defer session.Close()
-
-	log.Trace().Msg("new geo newGeoIndex")
 
 	s := session.Copy()
 	defer s.Close()

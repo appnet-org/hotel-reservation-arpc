@@ -38,7 +38,6 @@ func (s *Server) Run() error {
 		return fmt.Errorf("Server port must be set")
 	}
 
-	log.Info().Msg("Initializing aRPC clients...")
 	if err := s.initSearchClient("search.default.svc.cluster.local:8082"); err != nil {
 		return err
 	}
@@ -58,17 +57,13 @@ func (s *Server) Run() error {
 	if err := s.initReservation("reservation.default.svc.cluster.local:8087"); err != nil {
 		return err
 	}
-	log.Info().Msg("Successfull")
 
-	log.Trace().Msg("frontend before mux")
 	mux := tracing.NewServeMux(s.Tracer)
 	mux.Handle("/", http.FileServer(http.Dir("services/frontend/static")))
 	mux.Handle("/hotels", http.HandlerFunc(s.searchHandler))
 	mux.Handle("/recommendations", http.HandlerFunc(s.recommendHandler))
 	mux.Handle("/user", http.HandlerFunc(s.userHandler))
 	mux.Handle("/reservation", http.HandlerFunc(s.reservationHandler))
-
-	log.Trace().Msg("frontend starts serving")
 
 	tlsconfig := tls.GetHttpsOpt()
 	srv := &http.Server{
@@ -88,7 +83,7 @@ func (s *Server) Run() error {
 func (s *Server) initSearchClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
-	client, err := rpc.NewClient(serializer, name, nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create search aRPC client: %v", err)
 	}
@@ -100,7 +95,7 @@ func (s *Server) initSearchClient(name string) error {
 func (s *Server) initProfileClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
-	client, err := rpc.NewClient(serializer, name, nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create profile aRPC client: %v", err)
 	}
@@ -112,7 +107,7 @@ func (s *Server) initProfileClient(name string) error {
 func (s *Server) initRecommendationClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
-	client, err := rpc.NewClient(serializer, name, nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create recommendation aRPC client: %v", err)
 	}
@@ -123,7 +118,7 @@ func (s *Server) initRecommendationClient(name string) error {
 func (s *Server) initUserClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
-	client, err := rpc.NewClient(serializer, name, nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create user aRPC client: %v", err)
 	}
@@ -134,7 +129,7 @@ func (s *Server) initUserClient(name string) error {
 func (s *Server) initReservation(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
-	client, err := rpc.NewClient(serializer, name, nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create reservation aRPC client: %v", err)
 	}
@@ -148,8 +143,6 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	md := metadata.New(map[string]string{})
 	ctx := metadata.NewOutgoingContext(context.Background(), md)
-
-	fmt.Println("searchHandler Got a request!!")
 
 	// in/out dates from query params
 	inDate, outDate := r.URL.Query().Get("inDate"), r.URL.Query().Get("outDate")
@@ -170,9 +163,6 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	Lon, _ := strconv.ParseFloat(sLon, 32)
 	lon := float32(Lon)
 
-	// log.Trace().log("starts searchHandler querying downstream")
-
-	fmt.Printf("SEARCH [lat: %v, lon: %v, inDate: %v, outDate: %v\n", lat, lon, inDate, outDate)
 	// search for best hotels
 	searchResp, err := s.searchClient.Nearby(ctx, &hotel.SearchRequest{
 		Lat:     lat,
@@ -183,11 +173,6 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
-	}
-
-	fmt.Println("searchHandler got searchResp")
-	for _, hid := range searchResp.HotelIds {
-		fmt.Printf("Search Handler hotelId = %s\n", hid)
 	}
 
 	// grab locale from query params or default to en
@@ -204,13 +189,9 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		RoomNumber:   1,
 	})
 	if err != nil {
-		fmt.Println("SearchHandler CheckAvailability failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Println("searchHandler got reserveResp")
-	fmt.Printf("searchHandler gets reserveResp.HotelId = %s\n", reservationResp.HotelId)
 
 	// hotel profiles
 	profileResp, err := s.profileClient.GetProfiles(ctx, &hotel.GetProfilesRequest{
@@ -218,12 +199,9 @@ func (s *Server) searchHandler(w http.ResponseWriter, r *http.Request) {
 		Locale:   locale,
 	})
 	if err != nil {
-		fmt.Println("SearchHandler GetProfiles failed")
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Println("searchHandler gets profileResp")
 
 	json.NewEncoder(w).Encode(geoJSONResponse(profileResp.Hotels))
 }

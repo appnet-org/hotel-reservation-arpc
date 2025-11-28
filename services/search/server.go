@@ -4,6 +4,7 @@ import (
 	// "encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -47,6 +48,7 @@ func (s *Server) Run() error {
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
+		return err
 	}
 
 	hotel.RegisterSearchServer(server, s)
@@ -71,7 +73,7 @@ func (s *Server) Shutdown() {
 func (s *Server) initGeoClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
-	client, err := rpc.NewClient(serializer, name, nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create geo aRPC client: %v", err)
 	}
@@ -83,7 +85,7 @@ func (s *Server) initGeoClient(name string) error {
 func (s *Server) initRateClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
 
-	client, err := rpc.NewClient(serializer, name, nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create rate aRPC client: %v", err)
 	}
@@ -94,37 +96,43 @@ func (s *Server) initRateClient(name string) error {
 
 // Nearby returns ids of nearby hotels ordered by ranking algo
 func (s *Server) Nearby(ctx context.Context, req *hotel.SearchRequest) (*hotel.SearchResult, context.Context, error) {
-	// find nearby hotels
-	fmt.Println("Nearby got a message!!!")
-
-	fmt.Printf("nearby lat = %f\n", req.Lat)
-	fmt.Printf("nearby lon = %f\n", req.Lon)
-
 	if s.geoClient == nil {
-		fmt.Println("geo client not initialized")
+		log.Error().Msg("geo client not initialized")
+		return nil, ctx, fmt.Errorf("geo client not initialized")
 	}
 
-	nearby, err := s.geoClient.Nearby(ctx, &hotel.NearbyRequest{
+	// Add timeout to context to prevent hanging
+	geoCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	nearby, err := s.geoClient.Nearby(geoCtx, &hotel.NearbyRequest{
 		Lat:       req.Lat,
 		Lon:       req.Lon,
 		Latstring: fmt.Sprintf("%f", req.Lat),
 	})
 	if err != nil {
-		return nil, ctx, err
-	}
-
-	for _, hid := range nearby.HotelIds {
-		log.Trace().Msgf("get Nearby hotelId = %s", hid)
+		log.Error().Msgf("geoClient.Nearby failed: %v", err)
+		return nil, ctx, fmt.Errorf("geoClient.Nearby failed: %w", err)
 	}
 
 	// find rates for hotels
-	rates, err := s.rateClient.GetRates(ctx, &hotel.GetRatesRequest{
+	if s.rateClient == nil {
+		log.Error().Msg("rate client not initialized")
+		return nil, ctx, fmt.Errorf("rate client not initialized")
+	}
+
+	// Add timeout to context for rate client call
+	rateCtx, cancelRate := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelRate()
+
+	rates, err := s.rateClient.GetRates(rateCtx, &hotel.GetRatesRequest{
 		HotelIds: nearby.HotelIds,
 		InDate:   req.InDate,
 		OutDate:  req.OutDate,
 	})
 	if err != nil {
-		return nil, ctx, err
+		log.Error().Msgf("rateClient.GetRates failed: %v", err)
+		return nil, ctx, fmt.Errorf("rateClient.GetRates failed: %w", err)
 	}
 
 	// TODO(hw): add simple ranking algo to order hotel ids:
@@ -135,7 +143,6 @@ func (s *Server) Nearby(ctx context.Context, req *hotel.SearchRequest) (*hotel.S
 	// build the response
 	res := new(hotel.SearchResult)
 	for _, ratePlan := range rates.RatePlans {
-		// log.Trace().Msgf("gået RatePlan HotelId = %s, Code = %s", ratePlan.HotelId, ratePlan.Code)
 		res.HotelIds = append(res.HotelIds, ratePlan.HotelId)
 	}
 

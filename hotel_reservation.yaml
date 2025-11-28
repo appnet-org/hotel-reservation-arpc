@@ -44,6 +44,11 @@ spec:
         image: appnetorg/hotel-reservation-arpc:latest
         imagePullPolicy: Always
         name: hotel-reserv-user
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
         ports:
         - containerPort: 8086
         resources:
@@ -100,6 +105,11 @@ spec:
         image: appnetorg/hotel-reservation-arpc:latest
         imagePullPolicy: Always
         name: hotel-reserv-search
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
         ports:
         - containerPort: 8082
         resources:
@@ -156,6 +166,11 @@ spec:
         image: appnetorg/hotel-reservation-arpc:latest
         imagePullPolicy: Always
         name: hotel-reserv-reservation
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
         ports:
         - containerPort: 8087
         resources:
@@ -212,6 +227,11 @@ spec:
         image: appnetorg/hotel-reservation-arpc:latest
         imagePullPolicy: Always
         name: hotel-reserv-recommendation
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
         ports:
         - containerPort: 8085
         resources:
@@ -268,6 +288,11 @@ spec:
         image: appnetorg/hotel-reservation-arpc:latest
         imagePullPolicy: Always
         name: hotel-reserv-rate
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
         ports:
         - containerPort: 8084
         resources:
@@ -324,6 +349,11 @@ spec:
         image: appnetorg/hotel-reservation-arpc:latest
         imagePullPolicy: Always
         name: hotel-reserv-profile
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
         ports:
         - containerPort: 8081
         resources:
@@ -380,6 +410,11 @@ spec:
         image: appnetorg/hotel-reservation-arpc:latest
         imagePullPolicy: Always
         name: hotel-reserv-geo
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
         ports:
         - containerPort: 8083
         resources:
@@ -435,6 +470,11 @@ spec:
         image: appnetorg/hotel-reservation-arpc:latest
         imagePullPolicy: Always
         name: hotel-reserv-frontend
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
         ports:
         - containerPort: 5000
         resources:

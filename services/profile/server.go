@@ -47,13 +47,12 @@ func (s *Server) Run() error {
 
 	s.uuid = uuid.New().String()
 
-	log.Trace().Msgf("in run s.IpAddr = %s, port = %d", s.IpAddr, s.Port)
-
 	serializer := &serializer.SymphonySerializer{}
 	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, nil)
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
+		return err
 	}
 
 	pb.RegisterProfileServer(server, s)
@@ -75,8 +74,6 @@ func (s *Server) GetProfiles(ctx context.Context, req *pb.GetProfilesRequest) (*
 	// }
 	// defer session.Close()
 
-	log.Trace().Msgf("In GetProfiles")
-
 	res := new(pb.GetProfilesResult)
 	hotels := make([]*pb.Hotel, 0)
 	var wg sync.WaitGroup
@@ -90,8 +87,6 @@ func (s *Server) GetProfiles(ctx context.Context, req *pb.GetProfilesRequest) (*
 		profileMap[hotelId] = struct{}{}
 	}
 
-	log.Trace().Msgf("length of hotelIds: %v", len(hotelIds))
-
 	memSpan, _ := opentracing.StartSpanFromContext(ctx, "memcached_get_profile")
 	memSpan.SetTag("span.kind", "client")
 	resMap, err := s.MemcClient.GetMulti(hotelIds)
@@ -100,9 +95,6 @@ func (s *Server) GetProfiles(ctx context.Context, req *pb.GetProfilesRequest) (*
 		log.Panic().Msgf("Tried to get hotelIds [%v], but got memmcached error = %s", hotelIds, err)
 	} else {
 		for hotelId, item := range resMap {
-			profileStr := string(item.Value)
-			log.Trace().Msgf("memc hit with %v", profileStr)
-
 			hotelProf := new(pb.Hotel)
 			json.Unmarshal(item.Value, hotelProf)
 			hotels = append(hotels, hotelProf)
@@ -145,6 +137,5 @@ func (s *Server) GetProfiles(ctx context.Context, req *pb.GetProfilesRequest) (*
 	wg.Wait()
 
 	res.Hotels = hotels
-	log.Trace().Msgf("In GetProfiles after getting resp")
 	return res, ctx, nil
 }

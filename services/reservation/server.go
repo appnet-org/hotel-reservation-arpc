@@ -51,6 +51,7 @@ func (s *Server) Run() error {
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
+		return err
 	}
 
 	pb.RegisterReservationServer(server, s)
@@ -106,12 +107,10 @@ func (s *Server) MakeReservation(ctx context.Context, req *pb.ReservationRequest
 		case nil:
 			// memcached hit
 			count, _ = strconv.Atoi(string(item.Value))
-			log.Trace().Msgf("memcached hit %s = %d", memc_key, count)
 			memc_date_num_map[memc_key] = count + int(req.RoomNumber)
 
 		case memcache.ErrCacheMiss:
 			// memcached miss
-			log.Trace().Msgf("memcached miss")
 			reserve := make([]reservation, 0)
 			err := c.Find(&bson.M{"hotelId": hotelId, "inDate": indate, "outDate": outdate}).All(&reserve)
 			if err != nil {
@@ -137,7 +136,6 @@ func (s *Server) MakeReservation(ctx context.Context, req *pb.ReservationRequest
 		case nil:
 			// memcached hit
 			hotel_cap, _ = strconv.Atoi(string(item.Value))
-			log.Trace().Msgf("memcached hit %s = %d", memc_cap_key, hotel_cap)
 		case memcache.ErrCacheMiss:
 			// memcached miss
 			var num number
@@ -258,7 +256,6 @@ func (s *Server) CheckAvailability(ctx context.Context, req *pb.ReservationReque
 	reqCommand := []string{}
 	queryMap := make(map[string]map[string]string)
 	for _, hotelId := range req.HotelId {
-		log.Trace().Msgf("reservation check hotel %s", hotelId)
 		inDate, _ := time.Parse(
 			time.RFC3339,
 			req.InDate+"T12:00:00+00:00")
@@ -340,7 +337,6 @@ func (s *Server) CheckAvailability(ctx context.Context, req *pb.ReservationReque
 					}
 					var count int
 					for _, r := range reserve {
-						log.Trace().Msgf("reservation check reservation number = %d for hotelId %s", r.Number, queryItem["hotelId"])
 						count += r.Number
 					}
 					// update memcached

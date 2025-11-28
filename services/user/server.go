@@ -50,6 +50,7 @@ func (s *Server) Run() error {
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
+		return err
 	}
 
 	pb.RegisterUserServer(server, s)
@@ -66,8 +67,6 @@ func (s *Server) Shutdown() {
 // CheckUser returns whether the username and password are correct.
 func (s *Server) CheckUser(ctx context.Context, req *pb.CheckUserRequest) (*pb.CheckUserResult, context.Context, error) {
 	res := new(pb.CheckUserResult)
-
-	log.Trace().Msg("CheckUser")
 
 	sum := sha256.Sum256([]byte(req.Password))
 	pass := fmt.Sprintf("%x", sum)
@@ -89,10 +88,6 @@ func (s *Server) CheckUser(ctx context.Context, req *pb.CheckUserRequest) (*pb.C
 	if true_pass, found := s.users[req.Username]; found {
 		res.Correct = pass == true_pass
 	}
-
-	// res.Correct = user.Password == pass
-
-	log.Trace().Msgf("CheckUser %t", res.Correct)
 
 	return res, ctx, nil
 }
@@ -119,8 +114,6 @@ func loadUsers(session *mgo.Session) map[string]string {
 	for _, user := range users {
 		res[user.Username] = user.Password
 	}
-
-	log.Trace().Msg("Done load users")
 
 	return res
 }
