@@ -5,8 +5,8 @@ github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym
 github.com/HdrHistogram/hdrhistogram-go v1.1.2 h1:5IcZpTvzydCQeHzK4Ef/D5rrSqwxob0t8PQPMybUNFM=
 github.com/HdrHistogram/hdrhistogram-go v1.1.2/go.mod h1:yDgFjdqOqDEKOvasDdhWNXYg9BVp4O+o5f6V/ehm6Oo=
 github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
-github.com/appnet-org/arpc v0.0.0-20251125232921-a16f2d55e631 h1:8SgqmzXUTSAGpFRj8x0m5DknkCJ68VNEkKs7SKikofU=
-github.com/appnet-org/arpc v0.0.0-20251125232921-a16f2d55e631/go.mod h1:UlPwzxJw2K8pCLd2pxirK4Hi+HbcXG2ruaf3XeRruno=
+github.com/appnet-org/arpc v0.0.0-20251201053838-74c83c2562c5 h1:ZLVbOlHonFhO2AUdP2alhtylgsdrCo63z6UKqWgYAnk=
+github.com/appnet-org/arpc v0.0.0-20251201053838-74c83c2562c5/go.mod h1:UlPwzxJw2K8pCLd2pxirK4Hi+HbcXG2ruaf3XeRruno=
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da h1:8GUt8eRujhVEGZFFEjBj46YV4rDjvGrNxb0KMWYkL2I=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=

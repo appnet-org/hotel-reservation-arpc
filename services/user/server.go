@@ -1,23 +1,20 @@
 package user
 
 import (
-	"crypto/sha256"
-	"strconv"
-
-	// "encoding/json"
-	"fmt"
-
 	"context"
+	"crypto/sha256"
+	"fmt"
+	"strconv"
 
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
+	"github.com/appnetorg/hotel-reservation-arpc/services"
 	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-
-	"github.com/rs/zerolog/log"
 )
 
 const _ = "srv-user"
@@ -52,6 +49,8 @@ func (s *Server) Run() error {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
 		return err
 	}
+
+	defer services.SetupServer(server)()
 
 	pb.RegisterUserServer(server, s)
 

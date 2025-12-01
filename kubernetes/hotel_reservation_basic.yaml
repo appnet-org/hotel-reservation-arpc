@@ -49,6 +49,12 @@ spec:
           value: "info"
         - name: LOG_FORMAT
           value: "console"
+        - name: ENABLE_RELIABLE
+          value: "false"
+        - name: ENABLE_CC
+          value: "false"
+        - name: ENABLE_FC
+          value: "false"
         ports:
         - containerPort: 11006
         resources:
@@ -110,6 +116,12 @@ spec:
           value: "info"
         - name: LOG_FORMAT
           value: "console"
+        - name: ENABLE_RELIABLE
+          value: "false"
+        - name: ENABLE_CC
+          value: "false"
+        - name: ENABLE_FC
+          value: "false"
         ports:
         - containerPort: 11002
         resources:
@@ -171,6 +183,12 @@ spec:
           value: "info"
         - name: LOG_FORMAT
           value: "console"
+        - name: ENABLE_RELIABLE
+          value: "false"
+        - name: ENABLE_CC
+          value: "false"
+        - name: ENABLE_FC
+          value: "false"
         ports:
         - containerPort: 11007
         resources:
@@ -232,6 +250,12 @@ spec:
           value: "info"
         - name: LOG_FORMAT
           value: "console"
+        - name: ENABLE_RELIABLE
+          value: "false"
+        - name: ENABLE_CC
+          value: "false"
+        - name: ENABLE_FC
+          value: "false"
         ports:
         - containerPort: 11005
         resources:
@@ -293,6 +317,12 @@ spec:
           value: "info"
         - name: LOG_FORMAT
           value: "console"
+        - name: ENABLE_RELIABLE
+          value: "false"
+        - name: ENABLE_CC
+          value: "false"
+        - name: ENABLE_FC
+          value: "false"
         ports:
         - containerPort: 11004
         resources:
@@ -354,6 +384,12 @@ spec:
           value: "info"
         - name: LOG_FORMAT
           value: "console"
+        - name: ENABLE_RELIABLE
+          value: "false"
+        - name: ENABLE_CC
+          value: "false"
+        - name: ENABLE_FC
+          value: "false"
         ports:
         - containerPort: 11001
         resources:
@@ -415,6 +451,12 @@ spec:
           value: "info"
         - name: LOG_FORMAT
           value: "console"
+        - name: ENABLE_RELIABLE
+          value: "false"
+        - name: ENABLE_CC
+          value: "false"
+        - name: ENABLE_FC
+          value: "false"
         ports:
         - containerPort: 11003
         resources:
@@ -475,6 +517,12 @@ spec:
           value: "info"
         - name: LOG_FORMAT
           value: "console"
+        - name: ENABLE_RELIABLE
+          value: "false"
+        - name: ENABLE_CC
+          value: "false"
+        - name: ENABLE_FC
+          value: "false"
         ports:
         - containerPort: 11000
         resources:

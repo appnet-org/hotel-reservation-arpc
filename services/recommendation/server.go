@@ -1,12 +1,14 @@
 package recommendation
 
 import (
-	// "encoding/json"
+	"context"
 	"fmt"
+	"math"
 	"strconv"
 
-	"context"
-
+	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/serializer"
+	"github.com/appnetorg/hotel-reservation-arpc/services"
 	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/google/uuid"
 	"github.com/hailocab/go-geoindex"
@@ -14,11 +16,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
-
-	"math"
-
-	"github.com/appnet-org/arpc/pkg/rpc"
-	"github.com/appnet-org/arpc/pkg/serializer"
 )
 
 const _ = "srv-recommendation"
@@ -52,6 +49,8 @@ func (s *Server) Run() error {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
 		return err
 	}
+
+	defer services.SetupServer(server)()
 
 	pb.RegisterRecommendationServer(server, s)
 

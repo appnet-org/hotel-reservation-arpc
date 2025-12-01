@@ -1,22 +1,18 @@
 package search
 
 import (
-	// "encoding/json"
+	"context"
 	"fmt"
 	"strconv"
 	"time"
 
-	"github.com/rs/zerolog/log"
-
-	// "os"
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
+	"github.com/appnetorg/hotel-reservation-arpc/services"
 	hotel "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
-
-	"context"
-
 	"github.com/google/uuid"
 	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/rs/zerolog/log"
 )
 
 const _ = "srv-search"
@@ -51,6 +47,8 @@ func (s *Server) Run() error {
 		return err
 	}
 
+	defer services.SetupServer(server)()
+
 	hotel.RegisterSearchServer(server, s)
 
 	// init arpc clients before starting the server
@@ -71,9 +69,7 @@ func (s *Server) Shutdown() {
 }
 
 func (s *Server) initGeoClient(name string) error {
-	serializer := &serializer.SymphonySerializer{}
-
-	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
+	client, err := services.NewARPCClient(name)
 	if err != nil {
 		return fmt.Errorf("failed to create geo aRPC client: %v", err)
 	}
@@ -83,9 +79,7 @@ func (s *Server) initGeoClient(name string) error {
 }
 
 func (s *Server) initRateClient(name string) error {
-	serializer := &serializer.SymphonySerializer{}
-
-	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
+	client, err := services.NewARPCClient(name)
 	if err != nil {
 		return fmt.Errorf("failed to create rate aRPC client: %v", err)
 	}

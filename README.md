@@ -16,7 +16,7 @@ bash kubernetes/scripts/build-docker-images.sh
 
 ## Run Application
 ```bash
-kubectl apply -f hotel_reservation.yaml
+kubectl apply -f hotel-reservation-arpc/kubernetes/hotel_reservation_basic.yaml
 ```
 
 ### Test Application

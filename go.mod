@@ -3,7 +3,7 @@ module github.com/appnetorg/hotel-reservation-arpc
 go 1.24.0
 
 require (
-	github.com/appnet-org/arpc v0.0.0-20251125232921-a16f2d55e631
+	github.com/appnet-org/arpc v0.0.0-20251201053838-74c83c2562c5
 	github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto v0.0.0-00010101000000-000000000000
 	github.com/bradfitz/gomemcache v0.0.0-20230905024940-24af94b03874
 	github.com/google/uuid v1.6.0
