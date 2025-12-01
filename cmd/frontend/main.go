@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/appnet-org/arpc-tcp/pkg/logging"
+	"github.com/appnet-org/arpc-quic/pkg/logging"
 	"github.com/appnetorg/hotel-reservation-arpc/services/frontend"
 	"github.com/appnetorg/hotel-reservation-arpc/tracing"
 	"github.com/appnetorg/hotel-reservation-arpc/tune"

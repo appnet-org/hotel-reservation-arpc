@@ -5,7 +5,7 @@ set -e
 # --- Configuration ---
 USER="appnetorg"
 TAG="latest"
-IMAGE="hotel-reservation-arpc-tcp"
+IMAGE="hotel-reservation-arpc-quic"
 UPDATE_ARPC="0"  # Set to "1" to update aRPC dependency to latest main, "0" to use pinned version
 # ---
 

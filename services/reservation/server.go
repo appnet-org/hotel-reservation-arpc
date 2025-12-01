@@ -14,8 +14,8 @@ import (
 
 	"time"
 
-	"github.com/appnet-org/arpc-tcp/pkg/rpc"
-	"github.com/appnet-org/arpc-tcp/pkg/serializer"
+	"github.com/appnet-org/arpc-quic/pkg/rpc"
+	"github.com/appnet-org/arpc-quic/pkg/serializer"
 
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/rs/zerolog/log"

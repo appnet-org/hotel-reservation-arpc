@@ -41,7 +41,7 @@ spec:
       containers:
       - command:
         - ./user
-        image: appnetorg/hotel-reservation-arpc-tcp:latest
+        image: appnetorg/hotel-reservation-arpc-quic:latest
         imagePullPolicy: Always
         name: hotel-reserv-user
         env:
@@ -102,7 +102,7 @@ spec:
       containers:
       - command:
         - ./search
-        image: appnetorg/hotel-reservation-arpc-tcp:latest
+        image: appnetorg/hotel-reservation-arpc-quic:latest
         imagePullPolicy: Always
         name: hotel-reserv-search
         env:
@@ -163,7 +163,7 @@ spec:
       containers:
       - command:
         - ./reservation
-        image: appnetorg/hotel-reservation-arpc-tcp:latest
+        image: appnetorg/hotel-reservation-arpc-quic:latest
         imagePullPolicy: Always
         name: hotel-reserv-reservation
         env:
@@ -224,7 +224,7 @@ spec:
       containers:
       - command:
         - ./recommendation
-        image: appnetorg/hotel-reservation-arpc-tcp:latest
+        image: appnetorg/hotel-reservation-arpc-quic:latest
         imagePullPolicy: Always
         name: hotel-reserv-recommendation
         env:
@@ -285,7 +285,7 @@ spec:
       containers:
       - command:
         - ./rate
-        image: appnetorg/hotel-reservation-arpc-tcp:latest
+        image: appnetorg/hotel-reservation-arpc-quic:latest
         imagePullPolicy: Always
         name: hotel-reserv-rate
         env:
@@ -346,7 +346,7 @@ spec:
       containers:
       - command:
         - ./profile
-        image: appnetorg/hotel-reservation-arpc-tcp:latest
+        image: appnetorg/hotel-reservation-arpc-quic:latest
         imagePullPolicy: Always
         name: hotel-reserv-profile
         env:
@@ -407,7 +407,7 @@ spec:
       containers:
       - command:
         - ./geo
-        image: appnetorg/hotel-reservation-arpc-tcp:latest
+        image: appnetorg/hotel-reservation-arpc-quic:latest
         imagePullPolicy: Always
         name: hotel-reserv-geo
         env:
@@ -467,7 +467,7 @@ spec:
       containers:
       - command:
         - ./frontend
-        image: appnetorg/hotel-reservation-arpc-tcp:latest
+        image: appnetorg/hotel-reservation-arpc-quic:latest
         imagePullPolicy: Always
         name: hotel-reserv-frontend
         env:

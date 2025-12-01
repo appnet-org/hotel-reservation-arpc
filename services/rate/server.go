@@ -14,8 +14,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/appnet-org/arpc-tcp/pkg/rpc"
-	"github.com/appnet-org/arpc-tcp/pkg/serializer"
+	"github.com/appnet-org/arpc-quic/pkg/rpc"
+	"github.com/appnet-org/arpc-quic/pkg/serializer"
 	"github.com/rs/zerolog/log"
 
 	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"

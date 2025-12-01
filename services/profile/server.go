@@ -15,8 +15,8 @@ import (
 
 	"context"
 
-	"github.com/appnet-org/arpc-tcp/pkg/rpc"
-	"github.com/appnet-org/arpc-tcp/pkg/serializer"
+	"github.com/appnet-org/arpc-quic/pkg/rpc"
+	"github.com/appnet-org/arpc-quic/pkg/serializer"
 	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"

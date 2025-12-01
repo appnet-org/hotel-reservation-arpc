@@ -9,8 +9,8 @@ import (
 	"github.com/rs/zerolog/log"
 
 	// "os"
-	"github.com/appnet-org/arpc-tcp/pkg/rpc"
-	"github.com/appnet-org/arpc-tcp/pkg/serializer"
+	"github.com/appnet-org/arpc-quic/pkg/rpc"
+	"github.com/appnet-org/arpc-quic/pkg/serializer"
 	hotel "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 
 	"context"
