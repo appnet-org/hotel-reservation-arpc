@@ -8,7 +8,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/appnet-org/arpc/pkg/logging"
+	"github.com/appnet-org/arpc-tcp/pkg/logging"
 	"github.com/appnetorg/hotel-reservation-arpc/services/rate"
 	"github.com/appnetorg/hotel-reservation-arpc/tracing"
 	"github.com/appnetorg/hotel-reservation-arpc/tune"

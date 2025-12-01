@@ -17,8 +17,8 @@ import (
 
 	"math"
 
-	"github.com/appnet-org/arpc/pkg/rpc"
-	"github.com/appnet-org/arpc/pkg/serializer"
+	"github.com/appnet-org/arpc-tcp/pkg/rpc"
+	"github.com/appnet-org/arpc-tcp/pkg/serializer"
 )
 
 const _ = "srv-recommendation"

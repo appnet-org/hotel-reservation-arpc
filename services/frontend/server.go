@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/appnet-org/arpc/pkg/metadata"
+	"github.com/appnet-org/arpc-tcp/pkg/metadata"
 
-	"github.com/appnet-org/arpc/pkg/rpc"
-	"github.com/appnet-org/arpc/pkg/serializer"
+	"github.com/appnet-org/arpc-tcp/pkg/rpc"
+	"github.com/appnet-org/arpc-tcp/pkg/serializer"
 	hotel "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
 	"github.com/appnetorg/hotel-reservation-arpc/tls"
 	"github.com/rs/zerolog/log"

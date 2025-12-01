@@ -4,8 +4,8 @@ package hotel_reservation
 import (
 	"context"
 
-	"github.com/appnet-org/arpc/pkg/rpc"
-	"github.com/appnet-org/arpc/pkg/rpc/element"
+	"github.com/appnet-org/arpc-tcp/pkg/rpc"
+	"github.com/appnet-org/arpc-tcp/pkg/rpc/element"
 )
 
 // GeoClient is the client API for Geo service.
