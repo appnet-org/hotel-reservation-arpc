@@ -10,8 +10,10 @@ import (
 	"context"
 
 	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/rpc/element"
 	"github.com/appnet-org/arpc/pkg/serializer"
 	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
+	"github.com/appnetorg/hotel-reservation-arpc/services/messagelogger"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
 	"gopkg.in/mgo.v2"
@@ -46,7 +48,8 @@ func (s *Server) Run() error {
 	s.uuid = uuid.New().String()
 
 	serializer := &serializer.SymphonySerializer{}
-	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, nil)
+	serverLogger, _ := messagelogger.NewServerMessageLogger("user")
+	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, []element.RPCElement{serverLogger})
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)

@@ -3,9 +3,13 @@ module github.com/appnetorg/hotel-reservation-arpc
 go 1.24.0
 
 require (
+	capnproto.org/go/capnp/v3 v3.1.0-alpha.1
 	github.com/appnet-org/arpc v0.0.0-20251125232921-a16f2d55e631
+	github.com/appnetorg/hotel-reservation-arpc/proto/hotel/capnp v0.0.0-00010101000000-000000000000
+	github.com/appnetorg/hotel-reservation-arpc/proto/hotel/hotel_reservation v0.0.0-00010101000000-000000000000
 	github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto v0.0.0-00010101000000-000000000000
 	github.com/bradfitz/gomemcache v0.0.0-20230905024940-24af94b03874
+	github.com/google/flatbuffers v24.12.23+incompatible
 	github.com/google/uuid v1.6.0
 	github.com/hailocab/go-geoindex v0.0.0-20160127134810-64631bfe9711
 	github.com/hashicorp/consul v1.0.6
@@ -14,11 +18,11 @@ require (
 	github.com/rs/zerolog v1.31.0
 	github.com/uber/jaeger-client-go v2.30.0+incompatible
 	google.golang.org/grpc v1.75.0
+	google.golang.org/protobuf v1.36.10
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 )
 
 require (
-	capnproto.org/go/capnp/v3 v3.1.0-alpha.1 // indirect
 	github.com/HdrHistogram/hdrhistogram-go v1.1.2 // indirect
 	github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da // indirect
 	github.com/colega/zeropool v0.0.0-20230505084239-6fb4a4f75381 // indirect
@@ -42,9 +46,12 @@ require (
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
 replace github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto => ./proto/hotel
+
+replace github.com/appnetorg/hotel-reservation-arpc/proto/hotel/capnp => ./proto/hotel/capnp
+
+replace github.com/appnetorg/hotel-reservation-arpc/proto/hotel/hotel_reservation => ./proto/hotel/hotel_reservation

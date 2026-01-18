@@ -10,8 +10,10 @@ import (
 
 	// "os"
 	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/rpc/element"
 	"github.com/appnet-org/arpc/pkg/serializer"
 	hotel "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
+	"github.com/appnetorg/hotel-reservation-arpc/services/messagelogger"
 
 	"context"
 
@@ -44,7 +46,8 @@ func (s *Server) Run() error {
 	s.uuid = uuid.New().String()
 
 	serializer := &serializer.SymphonySerializer{}
-	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, nil)
+	serverLogger, _ := messagelogger.NewServerMessageLogger("search")
+	server, err := rpc.NewServer(s.IpAddr+":"+strconv.Itoa(s.Port), serializer, []element.RPCElement{serverLogger})
 
 	if err != nil {
 		log.Error().Msgf("Failed to start aRPC server: %v", err)
@@ -72,8 +75,9 @@ func (s *Server) Shutdown() {
 
 func (s *Server) initGeoClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
+	clientLogger, _ := messagelogger.NewClientMessageLogger("search")
 
-	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", []element.RPCElement{clientLogger})
 	if err != nil {
 		return fmt.Errorf("failed to create geo aRPC client: %v", err)
 	}
@@ -84,8 +88,9 @@ func (s *Server) initGeoClient(name string) error {
 
 func (s *Server) initRateClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
+	clientLogger, _ := messagelogger.NewClientMessageLogger("search")
 
-	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", []element.RPCElement{clientLogger})
 	if err != nil {
 		return fmt.Errorf("failed to create rate aRPC client: %v", err)
 	}

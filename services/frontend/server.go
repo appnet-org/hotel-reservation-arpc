@@ -10,8 +10,10 @@ import (
 	"github.com/appnet-org/arpc/pkg/metadata"
 
 	"github.com/appnet-org/arpc/pkg/rpc"
+	"github.com/appnet-org/arpc/pkg/rpc/element"
 	"github.com/appnet-org/arpc/pkg/serializer"
 	hotel "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
+	"github.com/appnetorg/hotel-reservation-arpc/services/messagelogger"
 	"github.com/appnetorg/hotel-reservation-arpc/tls"
 	"github.com/rs/zerolog/log"
 
@@ -82,8 +84,9 @@ func (s *Server) Run() error {
 
 func (s *Server) initSearchClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
+	clientLogger, _ := messagelogger.NewClientMessageLogger("frontend")
 
-	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", []element.RPCElement{clientLogger})
 	if err != nil {
 		return fmt.Errorf("failed to create search aRPC client: %v", err)
 	}
@@ -94,8 +97,9 @@ func (s *Server) initSearchClient(name string) error {
 
 func (s *Server) initProfileClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
+	clientLogger, _ := messagelogger.NewClientMessageLogger("frontend")
 
-	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", []element.RPCElement{clientLogger})
 	if err != nil {
 		return fmt.Errorf("failed to create profile aRPC client: %v", err)
 	}
@@ -106,8 +110,9 @@ func (s *Server) initProfileClient(name string) error {
 
 func (s *Server) initRecommendationClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
+	clientLogger, _ := messagelogger.NewClientMessageLogger("frontend")
 
-	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", []element.RPCElement{clientLogger})
 	if err != nil {
 		return fmt.Errorf("failed to create recommendation aRPC client: %v", err)
 	}
@@ -117,8 +122,9 @@ func (s *Server) initRecommendationClient(name string) error {
 
 func (s *Server) initUserClient(name string) error {
 	serializer := &serializer.SymphonySerializer{}
+	clientLogger, _ := messagelogger.NewClientMessageLogger("frontend")
 
-	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", []element.RPCElement{clientLogger})
 	if err != nil {
 		return fmt.Errorf("failed to create user aRPC client: %v", err)
 	}
@@ -128,8 +134,9 @@ func (s *Server) initUserClient(name string) error {
 
 func (s *Server) initReservation(name string) error {
 	serializer := &serializer.SymphonySerializer{}
+	clientLogger, _ := messagelogger.NewClientMessageLogger("frontend")
 
-	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", nil)
+	client, err := rpc.NewClientWithLocalAddr(serializer, name, "0.0.0.0:0", []element.RPCElement{clientLogger})
 	if err != nil {
 		return fmt.Errorf("failed to create reservation aRPC client: %v", err)
 	}
