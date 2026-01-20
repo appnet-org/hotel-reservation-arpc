@@ -3,13 +3,13 @@
 # Script to add volume mounts to Kubernetes YAML file for message logging
 # This script adds hostPath volume mounts to all service deployments
 # so that logs written to /var/log/arpc-messages inside containers
-# appear in /users/aruj/hotel-reservation-arpc/logs on the host machine
+# appear in /users/xzhu/hotel-reservation-arpc/logs on the host machine
 
 set -e
 
-YAML_FILE="/users/aruj/hotel-reservation-arpc/hotel_reservation.yaml"
-BACKUP_FILE="/users/aruj/hotel-reservation-arpc/hotel_reservation.yaml.bak"
-LOG_DIR="/users/aruj/hotel-reservation-arpc/logs"
+YAML_FILE="/users/xzhu/hotel-reservation-arpc/hotel_reservation.yaml"
+BACKUP_FILE="/users/xzhu/hotel-reservation-arpc/hotel_reservation.yaml.bak"
+LOG_DIR="/users/xzhu/hotel-reservation-arpc/logs"
 
 # Services that need message logging (aRPC services, not mongodb/memcached)
 SERVICES="user search reservation recommendation rate profile geo frontend"
@@ -27,8 +27,8 @@ python3 << 'PYTHON_SCRIPT'
 import yaml
 import sys
 
-yaml_file = "/users/aruj/hotel-reservation-arpc/hotel_reservation.yaml"
-log_dir = "/users/aruj/hotel-reservation-arpc/logs"
+yaml_file = "/users/xzhu/hotel-reservation-arpc/hotel_reservation.yaml"
+log_dir = "/users/xzhu/hotel-reservation-arpc/logs"
 services = ["user", "search", "reservation", "recommendation", "rate", "profile", "geo", "frontend"]
 
 # Load all documents from the YAML file

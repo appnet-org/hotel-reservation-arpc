@@ -63,7 +63,7 @@ spec:
       volumes:
       - name: message-logs
         hostPath:
-          path: /users/aruj/hotel-reservation-arpc/logs
+          path: /users/xzhu/hotel-reservation-arpc/logs
           type: DirectoryOrCreate
 ---
 apiVersion: v1
@@ -131,7 +131,7 @@ spec:
       volumes:
       - name: message-logs
         hostPath:
-          path: /users/aruj/hotel-reservation-arpc/logs
+          path: /users/xzhu/hotel-reservation-arpc/logs
           type: DirectoryOrCreate
 ---
 apiVersion: v1
@@ -199,7 +199,7 @@ spec:
       volumes:
       - name: message-logs
         hostPath:
-          path: /users/aruj/hotel-reservation-arpc/logs
+          path: /users/xzhu/hotel-reservation-arpc/logs
           type: DirectoryOrCreate
 ---
 apiVersion: v1
@@ -267,7 +267,7 @@ spec:
       volumes:
       - name: message-logs
         hostPath:
-          path: /users/aruj/hotel-reservation-arpc/logs
+          path: /users/xzhu/hotel-reservation-arpc/logs
           type: DirectoryOrCreate
 ---
 apiVersion: v1
@@ -335,7 +335,7 @@ spec:
       volumes:
       - name: message-logs
         hostPath:
-          path: /users/aruj/hotel-reservation-arpc/logs
+          path: /users/xzhu/hotel-reservation-arpc/logs
           type: DirectoryOrCreate
 ---
 apiVersion: v1
@@ -403,7 +403,7 @@ spec:
       volumes:
       - name: message-logs
         hostPath:
-          path: /users/aruj/hotel-reservation-arpc/logs
+          path: /users/xzhu/hotel-reservation-arpc/logs
           type: DirectoryOrCreate
 ---
 apiVersion: v1
@@ -471,7 +471,7 @@ spec:
       volumes:
       - name: message-logs
         hostPath:
-          path: /users/aruj/hotel-reservation-arpc/logs
+          path: /users/xzhu/hotel-reservation-arpc/logs
           type: DirectoryOrCreate
 ---
 apiVersion: v1
@@ -538,7 +538,7 @@ spec:
       volumes:
       - name: message-logs
         hostPath:
-          path: /users/aruj/hotel-reservation-arpc/logs
+          path: /users/xzhu/hotel-reservation-arpc/logs
           type: DirectoryOrCreate
 ---
 apiVersion: v1
@@ -1231,4 +1231,3 @@ spec:
     type: DirectoryOrCreate
   storageClassName: geo-storage
   volumeMode: Filesystem
----

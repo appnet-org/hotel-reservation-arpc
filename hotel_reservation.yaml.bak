@@ -46,9 +46,9 @@ spec:
         name: hotel-reserv-user
         env:
         - name: LOG_LEVEL
-          value: "info"
+          value: info
         - name: LOG_FORMAT
-          value: "console"
+          value: console
         ports:
         - containerPort: 11006
         resources:
@@ -56,8 +56,15 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h2.<node-name>
+        volumeMounts:
+        - name: message-logs
+          mountPath: /var/log/arpc-messages
       restartPolicy: Always
+      volumes:
+      - name: message-logs
+        hostPath:
+          path: /users/xzhu/hotel-reservation-arpc/logs
+          type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -107,9 +114,9 @@ spec:
         name: hotel-reserv-search
         env:
         - name: LOG_LEVEL
-          value: "info"
+          value: info
         - name: LOG_FORMAT
-          value: "console"
+          value: console
         ports:
         - containerPort: 11002
         resources:
@@ -117,8 +124,15 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h2.<node-name>
+        volumeMounts:
+        - name: message-logs
+          mountPath: /var/log/arpc-messages
       restartPolicy: Always
+      volumes:
+      - name: message-logs
+        hostPath:
+          path: /users/xzhu/hotel-reservation-arpc/logs
+          type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -168,9 +182,9 @@ spec:
         name: hotel-reserv-reservation
         env:
         - name: LOG_LEVEL
-          value: "info"
+          value: info
         - name: LOG_FORMAT
-          value: "console"
+          value: console
         ports:
         - containerPort: 11007
         resources:
@@ -178,8 +192,15 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h4.<node-name>
+        volumeMounts:
+        - name: message-logs
+          mountPath: /var/log/arpc-messages
       restartPolicy: Always
+      volumes:
+      - name: message-logs
+        hostPath:
+          path: /users/xzhu/hotel-reservation-arpc/logs
+          type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -229,9 +250,9 @@ spec:
         name: hotel-reserv-recommendation
         env:
         - name: LOG_LEVEL
-          value: "info"
+          value: info
         - name: LOG_FORMAT
-          value: "console"
+          value: console
         ports:
         - containerPort: 11005
         resources:
@@ -239,8 +260,15 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h2.<node-name>
+        volumeMounts:
+        - name: message-logs
+          mountPath: /var/log/arpc-messages
       restartPolicy: Always
+      volumes:
+      - name: message-logs
+        hostPath:
+          path: /users/xzhu/hotel-reservation-arpc/logs
+          type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -290,9 +318,9 @@ spec:
         name: hotel-reserv-rate
         env:
         - name: LOG_LEVEL
-          value: "info"
+          value: info
         - name: LOG_FORMAT
-          value: "console"
+          value: console
         ports:
         - containerPort: 11004
         resources:
@@ -300,8 +328,15 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h3.<node-name>
+        volumeMounts:
+        - name: message-logs
+          mountPath: /var/log/arpc-messages
       restartPolicy: Always
+      volumes:
+      - name: message-logs
+        hostPath:
+          path: /users/xzhu/hotel-reservation-arpc/logs
+          type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -351,9 +386,9 @@ spec:
         name: hotel-reserv-profile
         env:
         - name: LOG_LEVEL
-          value: "info"
+          value: info
         - name: LOG_FORMAT
-          value: "console"
+          value: console
         ports:
         - containerPort: 11001
         resources:
@@ -361,8 +396,15 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h5.<node-name>
+        volumeMounts:
+        - name: message-logs
+          mountPath: /var/log/arpc-messages
       restartPolicy: Always
+      volumes:
+      - name: message-logs
+        hostPath:
+          path: /users/xzhu/hotel-reservation-arpc/logs
+          type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -412,9 +454,9 @@ spec:
         name: hotel-reserv-geo
         env:
         - name: LOG_LEVEL
-          value: "info"
+          value: info
         - name: LOG_FORMAT
-          value: "console"
+          value: console
         ports:
         - containerPort: 11003
         resources:
@@ -422,8 +464,15 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h3.<node-name>
+        volumeMounts:
+        - name: message-logs
+          mountPath: /var/log/arpc-messages
       restartPolicy: Always
+      volumes:
+      - name: message-logs
+        hostPath:
+          path: /users/xzhu/hotel-reservation-arpc/logs
+          type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -472,9 +521,9 @@ spec:
         name: hotel-reserv-frontend
         env:
         - name: LOG_LEVEL
-          value: "info"
+          value: info
         - name: LOG_FORMAT
-          value: "console"
+          value: console
         ports:
         - containerPort: 11000
         resources:
@@ -482,8 +531,15 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h2.<node-name>
+        volumeMounts:
+        - name: message-logs
+          mountPath: /var/log/arpc-messages
       restartPolicy: Always
+      volumes:
+      - name: message-logs
+        hostPath:
+          path: /users/xzhu/hotel-reservation-arpc/logs
+          type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: Service
@@ -643,7 +699,6 @@ spec:
         - mountPath: /data/db
           name: user
       hostname: user-db
-      # nodeName: h2.<node-name>
       restartPolicy: Always
       volumes:
       - name: user
@@ -681,7 +736,6 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h4.<node-name>
       restartPolicy: Always
 ---
 apiVersion: apps/v1
@@ -716,7 +770,6 @@ spec:
         - mountPath: /data/db
           name: reservation
       hostname: reservation-db
-      # nodeName: h4.<node-name>
       restartPolicy: Always
       volumes:
       - name: reservation
@@ -755,7 +808,6 @@ spec:
         - mountPath: /data/db
           name: recommendation
       hostname: recommendation-db
-      # nodeName: h2.<node-name>
       restartPolicy: Always
       volumes:
       - name: recommendation
@@ -793,7 +845,6 @@ spec:
         volumeMounts:
         - mountPath: /data/db
           name: rate
-      # nodeName: h3.<node-name>
       restartPolicy: Always
       volumes:
       - name: rate
@@ -831,7 +882,6 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h3.<node-name>
       restartPolicy: Always
 ---
 apiVersion: apps/v1
@@ -865,7 +915,6 @@ spec:
             cpu: 1000m
           requests:
             cpu: 100m
-      # nodeName: h5.<node-name>
       restartPolicy: Always
 ---
 apiVersion: apps/v1
@@ -900,7 +949,6 @@ spec:
         - mountPath: /data/db
           name: profile
       hostname: profile-db
-      # nodeName: h5.<node-name>
       restartPolicy: Always
       volumes:
       - name: profile
@@ -938,7 +986,6 @@ spec:
         volumeMounts:
         - mountPath: /data/db
           name: geo
-      # nodeName: h3.<node-name>
       restartPolicy: Always
       volumes:
       - name: geo
