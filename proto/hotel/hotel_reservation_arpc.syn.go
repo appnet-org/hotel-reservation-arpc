@@ -3,10 +3,55 @@ package hotel_reservation
 
 import (
 	"context"
-
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/rpc/element"
 )
+
+// Service IDs
+const (
+	ServiceID_Geo            = 1
+	ServiceID_Profile        = 2
+	ServiceID_Recommendation = 3
+	ServiceID_Rate           = 4
+	ServiceID_Reservation    = 5
+	ServiceID_Search         = 6
+	ServiceID_User           = 7
+)
+
+// Service name <-> ID mappings
+var serviceNameToID = map[string]uint32{
+	"Geo":            ServiceID_Geo,
+	"Profile":        ServiceID_Profile,
+	"Recommendation": ServiceID_Recommendation,
+	"Rate":           ServiceID_Rate,
+	"Reservation":    ServiceID_Reservation,
+	"Search":         ServiceID_Search,
+	"User":           ServiceID_User,
+}
+
+var serviceIDToName = map[uint32]string{
+	ServiceID_Geo:            "Geo",
+	ServiceID_Profile:        "Profile",
+	ServiceID_Recommendation: "Recommendation",
+	ServiceID_Rate:           "Rate",
+	ServiceID_Reservation:    "Reservation",
+	ServiceID_Search:         "Search",
+	ServiceID_User:           "User",
+}
+
+// Method IDs for Geo
+const (
+	Geo_MethodID_Nearby = 1
+)
+
+// Method name <-> ID mappings for Geo
+var Geo_methodNameToID = map[string]uint32{
+	"Nearby": Geo_MethodID_Nearby,
+}
+
+var Geo_methodIDToName = map[uint32]string{
+	Geo_MethodID_Nearby: "Nearby",
+}
 
 // GeoClient is the client API for Geo service.
 type GeoClient interface {
@@ -18,6 +63,10 @@ type arpcGeoClient struct {
 }
 
 func NewGeoClient(client *rpc.Client) GeoClient {
+	// Create and register service registry
+	registry := rpc.NewServiceRegistry()
+	registry.RegisterService("Geo", ServiceID_Geo, Geo_methodNameToID)
+	client.SetServiceRegistry(registry)
 	return &arpcGeoClient{client: client}
 }
 
@@ -36,10 +85,12 @@ type GeoServer interface {
 func RegisterGeoServer(s *rpc.Server, srv GeoServer) {
 	s.RegisterService(&rpc.ServiceDesc{
 		ServiceName: "Geo",
+		ServiceID:   ServiceID_Geo,
 		ServiceImpl: srv,
-		Methods: map[string]*rpc.MethodDesc{
-			"Nearby": {
+		MethodsByID: map[uint32]*rpc.MethodDesc{
+			Geo_MethodID_Nearby: {
 				MethodName: "Nearby",
+				MethodID:   Geo_MethodID_Nearby,
 				Handler:    _Geo_Nearby_Handler,
 			},
 		},
@@ -70,6 +121,20 @@ func _Geo_Nearby_Handler(srv any, ctx context.Context, dec func(any) error, req 
 	return resp, ctx, err
 }
 
+// Method IDs for Profile
+const (
+	Profile_MethodID_GetProfiles = 1
+)
+
+// Method name <-> ID mappings for Profile
+var Profile_methodNameToID = map[string]uint32{
+	"GetProfiles": Profile_MethodID_GetProfiles,
+}
+
+var Profile_methodIDToName = map[uint32]string{
+	Profile_MethodID_GetProfiles: "GetProfiles",
+}
+
 // ProfileClient is the client API for Profile service.
 type ProfileClient interface {
 	GetProfiles(ctx context.Context, req *GetProfilesRequest) (*GetProfilesResult, error)
@@ -80,6 +145,10 @@ type arpcProfileClient struct {
 }
 
 func NewProfileClient(client *rpc.Client) ProfileClient {
+	// Create and register service registry
+	registry := rpc.NewServiceRegistry()
+	registry.RegisterService("Profile", ServiceID_Profile, Profile_methodNameToID)
+	client.SetServiceRegistry(registry)
 	return &arpcProfileClient{client: client}
 }
 
@@ -98,10 +167,12 @@ type ProfileServer interface {
 func RegisterProfileServer(s *rpc.Server, srv ProfileServer) {
 	s.RegisterService(&rpc.ServiceDesc{
 		ServiceName: "Profile",
+		ServiceID:   ServiceID_Profile,
 		ServiceImpl: srv,
-		Methods: map[string]*rpc.MethodDesc{
-			"GetProfiles": {
+		MethodsByID: map[uint32]*rpc.MethodDesc{
+			Profile_MethodID_GetProfiles: {
 				MethodName: "GetProfiles",
+				MethodID:   Profile_MethodID_GetProfiles,
 				Handler:    _Profile_GetProfiles_Handler,
 			},
 		},
@@ -132,6 +203,20 @@ func _Profile_GetProfiles_Handler(srv any, ctx context.Context, dec func(any) er
 	return resp, ctx, err
 }
 
+// Method IDs for Recommendation
+const (
+	Recommendation_MethodID_GetRecommendations = 1
+)
+
+// Method name <-> ID mappings for Recommendation
+var Recommendation_methodNameToID = map[string]uint32{
+	"GetRecommendations": Recommendation_MethodID_GetRecommendations,
+}
+
+var Recommendation_methodIDToName = map[uint32]string{
+	Recommendation_MethodID_GetRecommendations: "GetRecommendations",
+}
+
 // RecommendationClient is the client API for Recommendation service.
 type RecommendationClient interface {
 	GetRecommendations(ctx context.Context, req *GetRecommendationsRequest) (*GetRecommendationsResult, error)
@@ -142,6 +227,10 @@ type arpcRecommendationClient struct {
 }
 
 func NewRecommendationClient(client *rpc.Client) RecommendationClient {
+	// Create and register service registry
+	registry := rpc.NewServiceRegistry()
+	registry.RegisterService("Recommendation", ServiceID_Recommendation, Recommendation_methodNameToID)
+	client.SetServiceRegistry(registry)
 	return &arpcRecommendationClient{client: client}
 }
 
@@ -160,10 +249,12 @@ type RecommendationServer interface {
 func RegisterRecommendationServer(s *rpc.Server, srv RecommendationServer) {
 	s.RegisterService(&rpc.ServiceDesc{
 		ServiceName: "Recommendation",
+		ServiceID:   ServiceID_Recommendation,
 		ServiceImpl: srv,
-		Methods: map[string]*rpc.MethodDesc{
-			"GetRecommendations": {
+		MethodsByID: map[uint32]*rpc.MethodDesc{
+			Recommendation_MethodID_GetRecommendations: {
 				MethodName: "GetRecommendations",
+				MethodID:   Recommendation_MethodID_GetRecommendations,
 				Handler:    _Recommendation_GetRecommendations_Handler,
 			},
 		},
@@ -194,6 +285,20 @@ func _Recommendation_GetRecommendations_Handler(srv any, ctx context.Context, de
 	return resp, ctx, err
 }
 
+// Method IDs for Rate
+const (
+	Rate_MethodID_GetRates = 1
+)
+
+// Method name <-> ID mappings for Rate
+var Rate_methodNameToID = map[string]uint32{
+	"GetRates": Rate_MethodID_GetRates,
+}
+
+var Rate_methodIDToName = map[uint32]string{
+	Rate_MethodID_GetRates: "GetRates",
+}
+
 // RateClient is the client API for Rate service.
 type RateClient interface {
 	GetRates(ctx context.Context, req *GetRatesRequest) (*GetRatesResult, error)
@@ -204,6 +309,10 @@ type arpcRateClient struct {
 }
 
 func NewRateClient(client *rpc.Client) RateClient {
+	// Create and register service registry
+	registry := rpc.NewServiceRegistry()
+	registry.RegisterService("Rate", ServiceID_Rate, Rate_methodNameToID)
+	client.SetServiceRegistry(registry)
 	return &arpcRateClient{client: client}
 }
 
@@ -222,10 +331,12 @@ type RateServer interface {
 func RegisterRateServer(s *rpc.Server, srv RateServer) {
 	s.RegisterService(&rpc.ServiceDesc{
 		ServiceName: "Rate",
+		ServiceID:   ServiceID_Rate,
 		ServiceImpl: srv,
-		Methods: map[string]*rpc.MethodDesc{
-			"GetRates": {
+		MethodsByID: map[uint32]*rpc.MethodDesc{
+			Rate_MethodID_GetRates: {
 				MethodName: "GetRates",
+				MethodID:   Rate_MethodID_GetRates,
 				Handler:    _Rate_GetRates_Handler,
 			},
 		},
@@ -256,6 +367,23 @@ func _Rate_GetRates_Handler(srv any, ctx context.Context, dec func(any) error, r
 	return resp, ctx, err
 }
 
+// Method IDs for Reservation
+const (
+	Reservation_MethodID_MakeReservation   = 1
+	Reservation_MethodID_CheckAvailability = 2
+)
+
+// Method name <-> ID mappings for Reservation
+var Reservation_methodNameToID = map[string]uint32{
+	"MakeReservation":   Reservation_MethodID_MakeReservation,
+	"CheckAvailability": Reservation_MethodID_CheckAvailability,
+}
+
+var Reservation_methodIDToName = map[uint32]string{
+	Reservation_MethodID_MakeReservation:   "MakeReservation",
+	Reservation_MethodID_CheckAvailability: "CheckAvailability",
+}
+
 // ReservationClient is the client API for Reservation service.
 type ReservationClient interface {
 	MakeReservation(ctx context.Context, req *ReservationRequest) (*ReservationResult, error)
@@ -267,6 +395,10 @@ type arpcReservationClient struct {
 }
 
 func NewReservationClient(client *rpc.Client) ReservationClient {
+	// Create and register service registry
+	registry := rpc.NewServiceRegistry()
+	registry.RegisterService("Reservation", ServiceID_Reservation, Reservation_methodNameToID)
+	client.SetServiceRegistry(registry)
 	return &arpcReservationClient{client: client}
 }
 
@@ -294,14 +426,17 @@ type ReservationServer interface {
 func RegisterReservationServer(s *rpc.Server, srv ReservationServer) {
 	s.RegisterService(&rpc.ServiceDesc{
 		ServiceName: "Reservation",
+		ServiceID:   ServiceID_Reservation,
 		ServiceImpl: srv,
-		Methods: map[string]*rpc.MethodDesc{
-			"MakeReservation": {
+		MethodsByID: map[uint32]*rpc.MethodDesc{
+			Reservation_MethodID_MakeReservation: {
 				MethodName: "MakeReservation",
+				MethodID:   Reservation_MethodID_MakeReservation,
 				Handler:    _Reservation_MakeReservation_Handler,
 			},
-			"CheckAvailability": {
+			Reservation_MethodID_CheckAvailability: {
 				MethodName: "CheckAvailability",
+				MethodID:   Reservation_MethodID_CheckAvailability,
 				Handler:    _Reservation_CheckAvailability_Handler,
 			},
 		},
@@ -356,6 +491,20 @@ func _Reservation_CheckAvailability_Handler(srv any, ctx context.Context, dec fu
 	return resp, ctx, err
 }
 
+// Method IDs for Search
+const (
+	Search_MethodID_Nearby = 1
+)
+
+// Method name <-> ID mappings for Search
+var Search_methodNameToID = map[string]uint32{
+	"Nearby": Search_MethodID_Nearby,
+}
+
+var Search_methodIDToName = map[uint32]string{
+	Search_MethodID_Nearby: "Nearby",
+}
+
 // SearchClient is the client API for Search service.
 type SearchClient interface {
 	Nearby(ctx context.Context, req *SearchRequest) (*SearchResult, error)
@@ -366,6 +515,10 @@ type arpcSearchClient struct {
 }
 
 func NewSearchClient(client *rpc.Client) SearchClient {
+	// Create and register service registry
+	registry := rpc.NewServiceRegistry()
+	registry.RegisterService("Search", ServiceID_Search, Search_methodNameToID)
+	client.SetServiceRegistry(registry)
 	return &arpcSearchClient{client: client}
 }
 
@@ -384,10 +537,12 @@ type SearchServer interface {
 func RegisterSearchServer(s *rpc.Server, srv SearchServer) {
 	s.RegisterService(&rpc.ServiceDesc{
 		ServiceName: "Search",
+		ServiceID:   ServiceID_Search,
 		ServiceImpl: srv,
-		Methods: map[string]*rpc.MethodDesc{
-			"Nearby": {
+		MethodsByID: map[uint32]*rpc.MethodDesc{
+			Search_MethodID_Nearby: {
 				MethodName: "Nearby",
+				MethodID:   Search_MethodID_Nearby,
 				Handler:    _Search_Nearby_Handler,
 			},
 		},
@@ -418,6 +573,20 @@ func _Search_Nearby_Handler(srv any, ctx context.Context, dec func(any) error, r
 	return resp, ctx, err
 }
 
+// Method IDs for User
+const (
+	User_MethodID_CheckUser = 1
+)
+
+// Method name <-> ID mappings for User
+var User_methodNameToID = map[string]uint32{
+	"CheckUser": User_MethodID_CheckUser,
+}
+
+var User_methodIDToName = map[uint32]string{
+	User_MethodID_CheckUser: "CheckUser",
+}
+
 // UserClient is the client API for User service.
 type UserClient interface {
 	CheckUser(ctx context.Context, req *CheckUserRequest) (*CheckUserResult, error)
@@ -428,6 +597,10 @@ type arpcUserClient struct {
 }
 
 func NewUserClient(client *rpc.Client) UserClient {
+	// Create and register service registry
+	registry := rpc.NewServiceRegistry()
+	registry.RegisterService("User", ServiceID_User, User_methodNameToID)
+	client.SetServiceRegistry(registry)
 	return &arpcUserClient{client: client}
 }
 
@@ -446,10 +619,12 @@ type UserServer interface {
 func RegisterUserServer(s *rpc.Server, srv UserServer) {
 	s.RegisterService(&rpc.ServiceDesc{
 		ServiceName: "User",
+		ServiceID:   ServiceID_User,
 		ServiceImpl: srv,
-		Methods: map[string]*rpc.MethodDesc{
-			"CheckUser": {
+		MethodsByID: map[uint32]*rpc.MethodDesc{
+			User_MethodID_CheckUser: {
 				MethodName: "CheckUser",
+				MethodID:   User_MethodID_CheckUser,
 				Handler:    _User_CheckUser_Handler,
 			},
 		},

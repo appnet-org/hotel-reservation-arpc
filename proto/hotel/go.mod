@@ -3,7 +3,7 @@ module github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto
 go 1.24.0
 
 require (
-	github.com/appnet-org/arpc v0.0.0-20251125232921-a16f2d55e631
+	github.com/appnet-org/arpc v0.0.0-20260127065040-422057d11fe2
 	google.golang.org/protobuf v1.36.10
 )
 

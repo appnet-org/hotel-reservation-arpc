@@ -2,105 +2,477 @@
 package hotel_reservation
 
 import (
-	"encoding/binary"
-	"fmt"
 	math "math"
 )
 
+import (
+	"encoding/binary"
+	"fmt"
+)
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *NearbyRequest) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *NearbyRequest) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 12 // table
+	size += 4 + len(m.Latstring)
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 12
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (Lat): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], math.Float32bits(m.Lat))
+
+	// Field 2 (Lon): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[tableStart+4:], math.Float32bits(m.Lon))
+
+	// Field 3 (Latstring): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+8:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Latstring)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Latstring)
+	payloadOffset += 4 + len(m.Latstring)
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *NearbyRequest) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *NearbyRequest) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (Lat): fixed-length (4 bytes)
+	if len(data) < tableStart+4 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(data[tableStart+0:]))
+
+	// Field 2 (Lon): fixed-length (4 bytes)
+	if len(data) < tableStart+8 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(data[tableStart+4:]))
+
+	// Field 3 (Latstring): variable-length
+	if len(data) >= tableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+8:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Latstring = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	return nil
+}
+
 func (m *NearbyRequest) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 61)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1  // version byte
+	size += 12 // table entries
+	// Field 3 (Latstring): variable-length payload
+	size += 4 + len(m.Latstring) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2, 3}...)
+	buf := make([]byte, size)
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	offset += 4 // Lat
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
 
-	offset += 4 // Lon
+	// Calculate offset to private segment
+	publicSegmentSize := 13
 
-	// Field 3 (Latstring): string or bytes
-	buf = append(buf, byte(3))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Latstring
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Latstring)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Latstring)
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
 
-	// === DATA REGION SECTION ===
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
 
-	// Write fixed field (Lat)
-	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lat))
-	buf = append(buf, temp[:4]...)
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
 
-	// Write fixed field (Lon)
-	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lon))
-	buf = append(buf, temp[:4]...)
+	// Write private fields
+	privateTableStart := privateStart + 1 // 12 bytes table
+	privatePayloadStart := privateTableStart + 12
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
 
-	// Write string or bytes field (Latstring)
-	buf = append(buf, []byte(m.Latstring)...)
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (Lat): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], math.Float32bits(m.Lat))
+
+	// Field 2 (Lon): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[privateTableStart+4:], math.Float32bits(m.Lon))
+
+	// Field 3 (Latstring): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+8:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Latstring)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Latstring)
+	privatePayloadOffset += 4 + len(m.Latstring)
 
 	return buf, nil
 }
 
 func (m *NearbyRequest) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 4 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+3]
-	offset += 3
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 5
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 1; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // Lat
-			// Unmarshal fixed field (Lat)
-			if dataOffset+4 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (Lat): fixed-length (4 bytes)
+	if len(data) < privateTableStart+4 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+
+	// Field 2 (Lon): fixed-length (4 bytes)
+	if len(data) < privateTableStart+8 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(data[privateTableStart+4:]))
+
+	// Field 3 (Latstring): variable-length
+	if len(data) >= privateTableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+8:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Latstring = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-			m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
-			dataOffset += 4
-		case 2: // Lon
-			// Unmarshal fixed field (Lon)
-			if dataOffset+4 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
-			}
-			m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
-			dataOffset += 4
-		case 3: // Latstring
-			// Unmarshal string or []byte field (Latstring)
-			if entry, ok := offsets[3]; ok {
-				m.Latstring = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	return nil
+}
+
+type NearbyRequestRaw []byte
+
+func (m NearbyRequestRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *NearbyRequestRaw) UnmarshalSymphony(data []byte) error {
+	*m = NearbyRequestRaw(data)
+	return nil
+}
+
+func (m NearbyRequestRaw) GetLat() float32 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Lat called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Lat called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (Lat): fixed-length (4 bytes)
+	if len(m) < offsetToPrivate+1+4 {
+		return 0
+	}
+	return math.Float32frombits(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+}
+
+func (m NearbyRequestRaw) GetLon() float32 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Lon called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Lon called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (Lon): fixed-length (4 bytes)
+	if len(m) < offsetToPrivate+5+4 {
+		return 0
+	}
+	return math.Float32frombits(binary.LittleEndian.Uint32(m[offsetToPrivate+5:]))
+}
+
+func (m NearbyRequestRaw) GetLatstring() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Latstring called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Latstring called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 3 (Latstring): variable-length
+	if len(m) < offsetToPrivate+9+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+9:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m *NearbyRequestRaw) SetLat(v float32) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Lat called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Lat called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (Lat): fixed-length (4 bytes)
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint32((*m)[offsetToPrivate+1:], math.Float32bits(v))
+	return nil
+}
+
+func (m *NearbyRequestRaw) SetLon(v float32) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Lon called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Lon called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (Lon): fixed-length (4 bytes)
+	if len(*m) < offsetToPrivate+5+4 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint32((*m)[offsetToPrivate+5:], math.Float32bits(v))
+	return nil
+}
+
+func (m *NearbyRequestRaw) SetLatstring(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Latstring called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Latstring called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 3 (Latstring): variable-length
+	if len(*m) < offsetToPrivate+9+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+9:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp NearbyRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Latstring = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = NearbyRequestRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *NearbyResult) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *NearbyResult) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 4 // table
+	size += 4 // count for HotelIds
+	for _, item := range m.HotelIds {
+		size += 4 + len(item)
+	}
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 4
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (HotelIds): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	count = len(m.HotelIds)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(count))
+	currentOffset = payloadStart + payloadOffset + 4
+	for _, item := range m.HotelIds {
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	payloadOffset += 4 // count
+	for _, item := range m.HotelIds {
+		payloadOffset += 4 + len(item)
+	}
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *NearbyResult) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *NearbyResult) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (HotelIds): repeated variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelIds = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelIds = append(m.HotelIds, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
+					}
+				}
 			}
 		}
 	}
@@ -109,100 +481,356 @@ func (m *NearbyRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *NearbyResult) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 48)
-	var temp [8]byte // Reusable temp buffer for encoding
-
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1}...)
-
-	// === OFFSET TABLE SECTION ===
-	offset := 0
-
-	// Field 1 (HotelIds): repeated variable-length
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelIds
-	buf = append(buf, temp[:2]...)
-	totalLen := 0
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1 // version byte
+	size += 4 // table entries
+	// Field 1 (HotelIds): repeated variable-length payload
+	size += 4 // count
 	for _, item := range m.HotelIds {
-		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
+		size += 4 + len(item) // 4 bytes length prefix + data
 	}
-	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
-	buf = append(buf, temp[:2]...)
-	offset += totalLen
 
-	// === DATA REGION SECTION ===
+	buf := make([]byte, size)
 
-	// Write repeated variable-length field (HotelIds)
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
+
+	// Calculate offset to private segment
+	publicSegmentSize := 13
+
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 4 bytes table
+	privatePayloadStart := privateTableStart + 4
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (HotelIds): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	count = len(m.HotelIds)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(count))
+	currentOffset = privatePayloadStart + privatePayloadOffset + 4
 	for _, item := range m.HotelIds {
-		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
-		buf = append(buf, temp[:4]...)
-		buf = append(buf, []byte(item)...)
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	privatePayloadOffset += 4 // count
+	for _, item := range m.HotelIds {
+		privatePayloadOffset += 4 + len(item)
 	}
 
 	return buf, nil
 }
 
 func (m *NearbyResult) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 2 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+1]
-	offset += 1
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 5
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 1; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // HotelIds
-			// Unmarshal repeated variable-length field (HotelIds)
-			if entry, ok := offsets[1]; ok {
-				m.HotelIds = make([]string, 0)
-				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-				fieldOffset := 0
-				for fieldOffset < len(fieldData) {
-					if fieldOffset+4 > len(fieldData) {
-						return fmt.Errorf("insufficient data for item length")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (HotelIds): repeated variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelIds = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelIds = append(m.HotelIds, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
 					}
-					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
-					fieldOffset += 4
-					if itemLen == 0 {
-						m.HotelIds = append(m.HotelIds, "")
-						continue
-					}
-					if fieldOffset+int(itemLen) > len(fieldData) {
-						return fmt.Errorf("insufficient data for item data")
-					}
-					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
-					fieldOffset += int(itemLen)
-					m.HotelIds = append(m.HotelIds, string(itemData))
 				}
-				dataOffset += int(entry.length)
+			}
+		}
+	}
+
+	return nil
+}
+
+type NearbyResultRaw []byte
+
+func (m NearbyResultRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *NearbyResultRaw) UnmarshalSymphony(data []byte) error {
+	*m = NearbyResultRaw(data)
+	return nil
+}
+
+func (m NearbyResultRaw) GetHotelIds() []string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter HotelIds called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter HotelIds called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (HotelIds): repeated variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	count := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	result := make([]string, count)
+	currentOffset := payloadOffset + 4
+	for i := 0; i < count; i++ {
+		if len(m) < currentOffset+4 {
+			return nil
+		}
+		itemLen := int(binary.LittleEndian.Uint32(m[currentOffset:]))
+		if len(m) < currentOffset+4+itemLen {
+			return nil
+		}
+		result[i] = string(m[currentOffset+4 : currentOffset+4+itemLen])
+		currentOffset += 4 + itemLen
+	}
+	return result
+}
+
+func (m *NearbyResultRaw) SetHotelIds(v []string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter HotelIds called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter HotelIds called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (HotelIds): repeated variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldCount int
+	var oldDataSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldCount = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+		// Calculate old data size: 4 bytes count + for each item: 4 bytes length + data
+		oldDataSize = 4
+		currentOffset := oldPayloadOffset + 4
+		for i := 0; i < oldCount; i++ {
+			if len(*m) < currentOffset+4 {
+				break
+			}
+			itemLen := int(binary.LittleEndian.Uint32((*m)[currentOffset:]))
+			oldDataSize += 4 + itemLen
+			currentOffset += 4 + itemLen
+		}
+	}
+	newCount := len(v)
+	newDataSize := 4 // count
+	for _, item := range v {
+		newDataSize += 4 + len(item) // 4 bytes length + data
+	}
+	if oldPayloadOffset > 0 && newDataSize <= oldDataSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newCount))
+		currentOffset := oldPayloadOffset + 4
+		for _, item := range v {
+			itemLen := len(item)
+			binary.LittleEndian.PutUint32((*m)[currentOffset:], uint32(itemLen))
+			copy((*m)[currentOffset+4:], item)
+			currentOffset += 4 + itemLen
+		}
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp NearbyResult
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.HotelIds = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = NearbyResultRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *GetProfilesRequest) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *GetProfilesRequest) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 8 // table
+	size += 4 // count for HotelIds
+	for _, item := range m.HotelIds {
+		size += 4 + len(item)
+	}
+	size += 4 + len(m.Locale)
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 8
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (HotelIds): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	count = len(m.HotelIds)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(count))
+	currentOffset = payloadStart + payloadOffset + 4
+	for _, item := range m.HotelIds {
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	payloadOffset += 4 // count
+	for _, item := range m.HotelIds {
+		payloadOffset += 4 + len(item)
+	}
+
+	// Field 2 (Locale): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+4:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Locale)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Locale)
+	payloadOffset += 4 + len(m.Locale)
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *GetProfilesRequest) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *GetProfilesRequest) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (HotelIds): repeated variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelIds = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelIds = append(m.HotelIds, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
+					}
+				}
+			}
+		}
+	}
+
+	// Field 2 (Locale): variable-length
+	if len(data) >= tableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+4:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Locale = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
 		}
 	}
@@ -211,117 +839,445 @@ func (m *NearbyResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetProfilesRequest) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 96)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1 // version byte
+	size += 8 // table entries
+	// Field 1 (HotelIds): repeated variable-length payload
+	size += 4 // count
+	for _, item := range m.HotelIds {
+		size += 4 + len(item) // 4 bytes length prefix + data
+	}
+	// Field 2 (Locale): variable-length payload
+	size += 4 + len(m.Locale) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2}...)
+	buf := make([]byte, size)
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
+
+	// Calculate offset to private segment
+	publicSegmentSize := 13
+
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 8 bytes table
+	privatePayloadStart := privateTableStart + 8
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
 	// Field 1 (HotelIds): repeated variable-length
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelIds
-	buf = append(buf, temp[:2]...)
-	totalLen := 0
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	count = len(m.HotelIds)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(count))
+	currentOffset = privatePayloadStart + privatePayloadOffset + 4
 	for _, item := range m.HotelIds {
-		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
 	}
-	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
-	buf = append(buf, temp[:2]...)
-	offset += totalLen
-
-	// Field 2 (Locale): string or bytes
-	buf = append(buf, byte(2))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Locale
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Locale)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Locale)
-
-	// === DATA REGION SECTION ===
-
-	// Write repeated variable-length field (HotelIds)
+	privatePayloadOffset += 4 // count
 	for _, item := range m.HotelIds {
-		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
-		buf = append(buf, temp[:4]...)
-		buf = append(buf, []byte(item)...)
+		privatePayloadOffset += 4 + len(item)
 	}
 
-	// Write string or bytes field (Locale)
-	buf = append(buf, []byte(m.Locale)...)
+	// Field 2 (Locale): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+4:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Locale)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Locale)
+	privatePayloadOffset += 4 + len(m.Locale)
 
 	return buf, nil
 }
 
 func (m *GetProfilesRequest) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 3 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+2]
-	offset += 2
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 10
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 2; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // HotelIds
-			// Unmarshal repeated variable-length field (HotelIds)
-			if entry, ok := offsets[1]; ok {
-				m.HotelIds = make([]string, 0)
-				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-				fieldOffset := 0
-				for fieldOffset < len(fieldData) {
-					if fieldOffset+4 > len(fieldData) {
-						return fmt.Errorf("insufficient data for item length")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (HotelIds): repeated variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelIds = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelIds = append(m.HotelIds, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
 					}
-					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
-					fieldOffset += 4
-					if itemLen == 0 {
-						m.HotelIds = append(m.HotelIds, "")
-						continue
-					}
-					if fieldOffset+int(itemLen) > len(fieldData) {
-						return fmt.Errorf("insufficient data for item data")
-					}
-					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
-					fieldOffset += int(itemLen)
-					m.HotelIds = append(m.HotelIds, string(itemData))
 				}
-				dataOffset += int(entry.length)
 			}
-		case 2: // Locale
-			// Unmarshal string or []byte field (Locale)
-			if entry, ok := offsets[2]; ok {
-				m.Locale = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	// Field 2 (Locale): variable-length
+	if len(data) >= privateTableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+4:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Locale = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	return nil
+}
+
+type GetProfilesRequestRaw []byte
+
+func (m GetProfilesRequestRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *GetProfilesRequestRaw) UnmarshalSymphony(data []byte) error {
+	*m = GetProfilesRequestRaw(data)
+	return nil
+}
+
+func (m GetProfilesRequestRaw) GetHotelIds() []string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter HotelIds called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter HotelIds called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (HotelIds): repeated variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	count := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	result := make([]string, count)
+	currentOffset := payloadOffset + 4
+	for i := 0; i < count; i++ {
+		if len(m) < currentOffset+4 {
+			return nil
+		}
+		itemLen := int(binary.LittleEndian.Uint32(m[currentOffset:]))
+		if len(m) < currentOffset+4+itemLen {
+			return nil
+		}
+		result[i] = string(m[currentOffset+4 : currentOffset+4+itemLen])
+		currentOffset += 4 + itemLen
+	}
+	return result
+}
+
+func (m GetProfilesRequestRaw) GetLocale() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Locale called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Locale called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (Locale): variable-length
+	if len(m) < offsetToPrivate+5+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+5:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m *GetProfilesRequestRaw) SetHotelIds(v []string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter HotelIds called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter HotelIds called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (HotelIds): repeated variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldCount int
+	var oldDataSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldCount = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+		// Calculate old data size: 4 bytes count + for each item: 4 bytes length + data
+		oldDataSize = 4
+		currentOffset := oldPayloadOffset + 4
+		for i := 0; i < oldCount; i++ {
+			if len(*m) < currentOffset+4 {
+				break
+			}
+			itemLen := int(binary.LittleEndian.Uint32((*m)[currentOffset:]))
+			oldDataSize += 4 + itemLen
+			currentOffset += 4 + itemLen
+		}
+	}
+	newCount := len(v)
+	newDataSize := 4 // count
+	for _, item := range v {
+		newDataSize += 4 + len(item) // 4 bytes length + data
+	}
+	if oldPayloadOffset > 0 && newDataSize <= oldDataSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newCount))
+		currentOffset := oldPayloadOffset + 4
+		for _, item := range v {
+			itemLen := len(item)
+			binary.LittleEndian.PutUint32((*m)[currentOffset:], uint32(itemLen))
+			copy((*m)[currentOffset+4:], item)
+			currentOffset += 4 + itemLen
+		}
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp GetProfilesRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.HotelIds = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = GetProfilesRequestRaw(newData)
+	return nil
+}
+
+func (m *GetProfilesRequestRaw) SetLocale(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Locale called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Locale called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (Locale): variable-length
+	if len(*m) < offsetToPrivate+5+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+5:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp GetProfilesRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Locale = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = GetProfilesRequestRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *GetProfilesResult) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *GetProfilesResult) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 4 // table
+	size += 4 // count for Hotels
+	for _, item := range m.Hotels {
+		nested, _ := item.MarshalSymphony()
+		size += 4 + len(nested)
+	}
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 4
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (Hotels): repeated nested message
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	count = len(m.Hotels)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(count))
+	payloadOffset += 4
+	currentOffset = payloadStart + payloadOffset
+	for _, item := range m.Hotels {
+		nestedData, err := item.MarshalSymphony()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal nested message: %w", err)
+		}
+		nestedSize := len(nestedData)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(nestedSize))
+		copy(buf[currentOffset+4:], nestedData)
+		currentOffset += 4 + nestedSize
+		payloadOffset += 4 + nestedSize
+	}
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *GetProfilesResult) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *GetProfilesResult) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (Hotels): repeated nested message
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.Hotels = make([]*Hotel, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						item := &Hotel{}
+						if err := item.UnmarshalSymphony(data[currentOffset+4 : currentOffset+4+itemLen]); err != nil {
+							return fmt.Errorf("failed to unmarshal nested message: %w", err)
+						}
+						m.Hotels = append(m.Hotels, item)
+						currentOffset += 4 + itemLen
+					}
+				}
 			}
 		}
 	}
@@ -330,119 +1286,520 @@ func (m *GetProfilesRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetProfilesResult) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 88)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1 // version byte
+	size += 4 // table entries
+	// Field 1 (Hotels): repeated nested message payload
+	size += 4 // count
+	for _, item := range m.Hotels {
+		nestedSize1 := 0
+		// Public segment:
+		nestedSize1 += 1  // version byte
+		nestedSize1 += 12 // reserved: offset_to_private, service_name, method_name
+		// Private segment:
+		nestedSize1 += 1  // version byte
+		nestedSize1 += 24 // table entries
+		// Field 1 (Id): variable-length payload
+		nestedSize1 += 4 + len(item.Id) // 4 bytes length prefix + data
+		// Field 2 (Name): variable-length payload
+		nestedSize1 += 4 + len(item.Name) // 4 bytes length prefix + data
+		// Field 3 (PhoneNumber): variable-length payload
+		nestedSize1 += 4 + len(item.PhoneNumber) // 4 bytes length prefix + data
+		// Field 4 (Description): variable-length payload
+		nestedSize1 += 4 + len(item.Description) // 4 bytes length prefix + data
+		// Field 5 (Address): nested message payload
+		if item.Address != nil {
+			nestedSize2 := 0
+			// Public segment:
+			nestedSize2 += 1  // version byte
+			nestedSize2 += 12 // reserved: offset_to_private, service_name, method_name
+			// Private segment:
+			nestedSize2 += 1  // version byte
+			nestedSize2 += 32 // table entries
+			// Field 1 (StreetNumber): variable-length payload
+			nestedSize2 += 4 + len(item.Address.StreetNumber) // 4 bytes length prefix + data
+			// Field 2 (StreetName): variable-length payload
+			nestedSize2 += 4 + len(item.Address.StreetName) // 4 bytes length prefix + data
+			// Field 3 (City): variable-length payload
+			nestedSize2 += 4 + len(item.Address.City) // 4 bytes length prefix + data
+			// Field 4 (State): variable-length payload
+			nestedSize2 += 4 + len(item.Address.State) // 4 bytes length prefix + data
+			// Field 5 (Country): variable-length payload
+			nestedSize2 += 4 + len(item.Address.Country) // 4 bytes length prefix + data
+			// Field 6 (PostalCode): variable-length payload
+			nestedSize2 += 4 + len(item.Address.PostalCode) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1}...)
-
-	// === PRE-MARSHAL/CACHE SECTION FOR NESTED MESSAGES ===
-
-	var err error
-	cachedRepeatedMessages := make(map[byte][][]byte)
-	// Cache field 1 (Hotels): repeated message
-	cachedRepeatedMessages[1] = make([][]byte, len(m.Hotels))
-	for i, item := range m.Hotels {
-		if item != nil {
-			cachedRepeatedMessages[1][i], err = item.MarshalSymphony()
+			nestedSize1 += 4 + nestedSize2 // 4 bytes size + message data
 		}
+		// Field 6 (Images): repeated nested message payload
+		nestedSize1 += 4 // count
+		for _, item := range item.Images {
+			nestedSize2 := 0
+			// Public segment:
+			nestedSize2 += 1  // version byte
+			nestedSize2 += 12 // reserved: offset_to_private, service_name, method_name
+			// Private segment:
+			nestedSize2 += 1 // version byte
+			nestedSize2 += 5 // table entries
+			// Field 1 (Url): variable-length payload
+			nestedSize2 += 4 + len(item.Url) // 4 bytes length prefix + data
+
+			nestedSize1 += 4 + nestedSize2 // 4 bytes size + message data
+		}
+
+		size += 4 + nestedSize1 // 4 bytes size + message data
+	}
+
+	buf := make([]byte, size)
+
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
+
+	// Calculate offset to private segment
+	publicSegmentSize := 13
+
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 4 bytes table
+	privatePayloadStart := privateTableStart + 4
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (Hotels): repeated nested message
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	count = len(m.Hotels)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(count))
+	privatePayloadOffset += 4
+	currentOffset = privatePayloadStart + privatePayloadOffset
+	for _, item := range m.Hotels {
+		nestedData, err := item.MarshalSymphony()
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal repeated message field Hotels[%d]: %w", i, err)
+			return nil, fmt.Errorf("failed to marshal nested message: %w", err)
 		}
-	}
-
-	// === OFFSET TABLE SECTION ===
-	offset := 0
-
-	// Field 1 (Hotels): nested message
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset))
-	buf = append(buf, temp[:2]...)
-	totalLen := 0
-	for _, item := range cachedRepeatedMessages[1] {
-		totalLen += 4 + len(item) // 4 bytes for length + message data
-	}
-	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
-	buf = append(buf, temp[:2]...)
-	offset += totalLen
-
-	// === DATA REGION SECTION ===
-
-	// Write nested message field (Hotels)
-	for _, item := range cachedRepeatedMessages[1] {
-		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
-		buf = append(buf, temp[:4]...)
-		buf = append(buf, item...)
+		nestedSize := len(nestedData)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(nestedSize))
+		copy(buf[currentOffset+4:], nestedData)
+		currentOffset += 4 + nestedSize
+		privatePayloadOffset += 4 + nestedSize
 	}
 
 	return buf, nil
 }
 
 func (m *GetProfilesResult) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 2 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+1]
-	offset += 1
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 5
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 1; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // Hotels
-			// Unmarshal nested message field (Hotels)
-			if entry, ok := offsets[1]; ok {
-				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-				m.Hotels = make([]*Hotel, 0)
-				fieldOffset := 0
-				for fieldOffset < len(fieldData) {
-					if fieldOffset+4 > len(fieldData) {
-						return fmt.Errorf("insufficient data for item length")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (Hotels): repeated nested message
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.Hotels = make([]*Hotel, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						item := &Hotel{}
+						if err := item.UnmarshalSymphony(data[currentOffset+4 : currentOffset+4+itemLen]); err != nil {
+							return fmt.Errorf("failed to unmarshal nested message: %w", err)
+						}
+						m.Hotels = append(m.Hotels, item)
+						currentOffset += 4 + itemLen
 					}
-					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
-					fieldOffset += 4
-					if itemLen == 0 {
-						m.Hotels = append(m.Hotels, nil)
-						continue
-					}
-					if fieldOffset+int(itemLen) > len(fieldData) {
-						return fmt.Errorf("insufficient data for item bytes")
-					}
-					itemBytes := fieldData[fieldOffset : fieldOffset+int(itemLen)]
-					fieldOffset += int(itemLen)
-					newItem := &Hotel{}
-					if err := newItem.UnmarshalSymphony(itemBytes); err != nil {
-						return fmt.Errorf("failed to unmarshal nested message: %w", err)
-					}
-					m.Hotels = append(m.Hotels, newItem)
 				}
-				dataOffset += int(entry.length)
+			}
+		}
+	}
+
+	return nil
+}
+
+type GetProfilesResultRaw []byte
+
+func (m GetProfilesResultRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *GetProfilesResultRaw) UnmarshalSymphony(data []byte) error {
+	*m = GetProfilesResultRaw(data)
+	return nil
+}
+
+func (m GetProfilesResultRaw) GetHotels() []HotelRaw {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Hotels called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Hotels called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (Hotels): repeated nested message
+	if len(m) < offsetToPrivate+1+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	count := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	result := make([]HotelRaw, count)
+	currentOffset := payloadOffset + 4
+	for i := 0; i < count; i++ {
+		if len(m) < currentOffset+4 {
+			return nil
+		}
+		nestedSize := int(binary.LittleEndian.Uint32(m[currentOffset:]))
+		if len(m) < currentOffset+4+nestedSize {
+			return nil
+		}
+		result[i] = HotelRaw(m[currentOffset+4 : currentOffset+4+nestedSize])
+		currentOffset += 4 + nestedSize
+	}
+	return result
+}
+
+func (m *GetProfilesResultRaw) SetHotels(v []HotelRaw) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Hotels called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Hotels called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (Hotels): repeated nested message
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldCount int
+	var oldDataSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldCount = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+		// Calculate old data size: 4 bytes count + for each item: 4 bytes size + data
+		oldDataSize = 4
+		currentOffset := oldPayloadOffset + 4
+		for i := 0; i < oldCount; i++ {
+			if len(*m) < currentOffset+4 {
+				break
+			}
+			itemSize := int(binary.LittleEndian.Uint32((*m)[currentOffset:]))
+			oldDataSize += 4 + itemSize
+			currentOffset += 4 + itemSize
+		}
+	}
+	newCount := len(v)
+	newDataSize := 4 // count
+	for _, item := range v {
+		newDataSize += 4 + len(item) // 4 bytes size + data
+	}
+	if oldPayloadOffset > 0 && newDataSize <= oldDataSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newCount))
+		currentOffset := oldPayloadOffset + 4
+		for _, item := range v {
+			itemSize := len(item)
+			binary.LittleEndian.PutUint32((*m)[currentOffset:], uint32(itemSize))
+			copy((*m)[currentOffset+4:], item)
+			currentOffset += 4 + itemSize
+		}
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp GetProfilesResult
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Hotels = make([]*Hotel, len(v))
+	for i, rawItem := range v {
+		temp.Hotels[i] = &Hotel{}
+		if err := temp.Hotels[i].UnmarshalSymphony([]byte(rawItem)); err != nil {
+			return fmt.Errorf("failed to unmarshal nested message: %w", err)
+		}
+	}
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = GetProfilesResultRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *Hotel) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *Hotel) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 24 // table
+	size += 4 + len(m.Id)
+	size += 4 + len(m.Name)
+	size += 4 + len(m.PhoneNumber)
+	size += 4 + len(m.Description)
+	if m.Address != nil {
+		nested, _ := m.Address.MarshalSymphony()
+		size += 4 + len(nested)
+	}
+	size += 4 // count for Images
+	for _, item := range m.Images {
+		nested, _ := item.MarshalSymphony()
+		size += 4 + len(nested)
+	}
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 24
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (Id): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Id)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Id)
+	payloadOffset += 4 + len(m.Id)
+
+	// Field 2 (Name): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+4:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Name)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Name)
+	payloadOffset += 4 + len(m.Name)
+
+	// Field 3 (PhoneNumber): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+8:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.PhoneNumber)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.PhoneNumber)
+	payloadOffset += 4 + len(m.PhoneNumber)
+
+	// Field 4 (Description): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+12:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Description)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Description)
+	payloadOffset += 4 + len(m.Description)
+
+	// Field 5 (Address): nested message
+	if m.Address != nil {
+		binary.LittleEndian.PutUint32(buf[tableStart+16:], uint32(payloadStart+payloadOffset))
+		nestedData, err := m.Address.MarshalSymphony()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal nested message: %w", err)
+		}
+		nestedSize := len(nestedData)
+		binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(nestedSize))
+		copy(buf[payloadStart+payloadOffset+4:], nestedData)
+		payloadOffset += 4 + nestedSize
+	} else {
+		binary.LittleEndian.PutUint32(buf[tableStart+16:], 0)
+	}
+
+	// Field 6 (Images): repeated nested message
+	binary.LittleEndian.PutUint32(buf[tableStart+20:], uint32(payloadStart+payloadOffset))
+	count = len(m.Images)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(count))
+	payloadOffset += 4
+	currentOffset = payloadStart + payloadOffset
+	for _, item := range m.Images {
+		nestedData, err := item.MarshalSymphony()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal nested message: %w", err)
+		}
+		nestedSize := len(nestedData)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(nestedSize))
+		copy(buf[currentOffset+4:], nestedData)
+		currentOffset += 4 + nestedSize
+		payloadOffset += 4 + nestedSize
+	}
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *Hotel) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *Hotel) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (Id): variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Id = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 2 (Name): variable-length
+	if len(data) >= tableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+4:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Name = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 3 (PhoneNumber): variable-length
+	if len(data) >= tableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+8:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.PhoneNumber = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 4 (Description): variable-length
+	if len(data) >= tableStart+12+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+12:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Description = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 5 (Address): nested message
+	if len(data) >= tableStart+16+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+16:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Address = &Address{}
+				if err := m.Address.UnmarshalSymphony(data[payloadOffset+4 : payloadOffset+4+dataLen]); err != nil {
+					return fmt.Errorf("failed to unmarshal nested message: %w", err)
+				}
+			}
+		}
+	}
+
+	// Field 6 (Images): repeated nested message
+	if len(data) >= tableStart+20+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+20:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.Images = make([]*Image, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						item := &Image{}
+						if err := item.UnmarshalSymphony(data[currentOffset+4 : currentOffset+4+itemLen]); err != nil {
+							return fmt.Errorf("failed to unmarshal nested message: %w", err)
+						}
+						m.Images = append(m.Images, item)
+						currentOffset += 4 + itemLen
+					}
+				}
 			}
 		}
 	}
@@ -451,602 +1808,2611 @@ func (m *GetProfilesResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *Hotel) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 366)
-	var temp [8]byte // Reusable temp buffer for encoding
-
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2, 3, 4, 5, 6}...)
-
-	// === PRE-MARSHAL/CACHE SECTION FOR NESTED MESSAGES ===
-
-	var err error
-	cachedSingularMessages := make(map[byte][]byte)
-	// Cache field 5 (Address): singular message
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1  // version byte
+	size += 24 // table entries
+	// Field 1 (Id): variable-length payload
+	size += 4 + len(m.Id) // 4 bytes length prefix + data
+	// Field 2 (Name): variable-length payload
+	size += 4 + len(m.Name) // 4 bytes length prefix + data
+	// Field 3 (PhoneNumber): variable-length payload
+	size += 4 + len(m.PhoneNumber) // 4 bytes length prefix + data
+	// Field 4 (Description): variable-length payload
+	size += 4 + len(m.Description) // 4 bytes length prefix + data
+	// Field 5 (Address): nested message payload
 	if m.Address != nil {
-		cachedSingularMessages[5], err = m.Address.MarshalSymphony()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal singular message field Address: %w", err)
-		}
+		nestedSize1 := 0
+		// Public segment:
+		nestedSize1 += 1  // version byte
+		nestedSize1 += 12 // reserved: offset_to_private, service_name, method_name
+		// Private segment:
+		nestedSize1 += 1  // version byte
+		nestedSize1 += 32 // table entries
+		// Field 1 (StreetNumber): variable-length payload
+		nestedSize1 += 4 + len(m.Address.StreetNumber) // 4 bytes length prefix + data
+		// Field 2 (StreetName): variable-length payload
+		nestedSize1 += 4 + len(m.Address.StreetName) // 4 bytes length prefix + data
+		// Field 3 (City): variable-length payload
+		nestedSize1 += 4 + len(m.Address.City) // 4 bytes length prefix + data
+		// Field 4 (State): variable-length payload
+		nestedSize1 += 4 + len(m.Address.State) // 4 bytes length prefix + data
+		// Field 5 (Country): variable-length payload
+		nestedSize1 += 4 + len(m.Address.Country) // 4 bytes length prefix + data
+		// Field 6 (PostalCode): variable-length payload
+		nestedSize1 += 4 + len(m.Address.PostalCode) // 4 bytes length prefix + data
+
+		size += 4 + nestedSize1 // 4 bytes size + message data
+	}
+	// Field 6 (Images): repeated nested message payload
+	size += 4 // count
+	for _, item := range m.Images {
+		nestedSize1 := 0
+		// Public segment:
+		nestedSize1 += 1  // version byte
+		nestedSize1 += 12 // reserved: offset_to_private, service_name, method_name
+		// Private segment:
+		nestedSize1 += 1 // version byte
+		nestedSize1 += 5 // table entries
+		// Field 1 (Url): variable-length payload
+		nestedSize1 += 4 + len(item.Url) // 4 bytes length prefix + data
+
+		size += 4 + nestedSize1 // 4 bytes size + message data
 	}
 
-	cachedRepeatedMessages := make(map[byte][][]byte)
-	// Cache field 6 (Images): repeated message
-	cachedRepeatedMessages[6] = make([][]byte, len(m.Images))
-	for i, item := range m.Images {
-		if item != nil {
-			cachedRepeatedMessages[6][i], err = item.MarshalSymphony()
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal repeated message field Images[%d]: %w", i, err)
-		}
-	}
+	buf := make([]byte, size)
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// Field 1 (Id): string or bytes
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Id
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Id)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Id)
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
 
-	// Field 2 (Name): string or bytes
-	buf = append(buf, byte(2))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Name
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Name)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Name)
+	// Calculate offset to private segment
+	publicSegmentSize := 13
 
-	// Field 3 (PhoneNumber): string or bytes
-	buf = append(buf, byte(3))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of PhoneNumber
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.PhoneNumber)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.PhoneNumber)
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
 
-	// Field 4 (Description): string or bytes
-	buf = append(buf, byte(4))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Description
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Description)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Description)
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 24 bytes table
+	privatePayloadStart := privateTableStart + 24
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (Id): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Id)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Id)
+	privatePayloadOffset += 4 + len(m.Id)
+
+	// Field 2 (Name): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+4:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Name)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Name)
+	privatePayloadOffset += 4 + len(m.Name)
+
+	// Field 3 (PhoneNumber): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+8:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.PhoneNumber)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.PhoneNumber)
+	privatePayloadOffset += 4 + len(m.PhoneNumber)
+
+	// Field 4 (Description): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+12:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Description)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Description)
+	privatePayloadOffset += 4 + len(m.Description)
 
 	// Field 5 (Address): nested message
-	buf = append(buf, byte(5))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset))
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(cachedSingularMessages[5])))
-	buf = append(buf, temp[:2]...)
-	offset += len(cachedSingularMessages[5])
-
-	// Field 6 (Images): nested message
-	buf = append(buf, byte(6))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset))
-	buf = append(buf, temp[:2]...)
-	totalLen := 0
-	for _, item := range cachedRepeatedMessages[6] {
-		totalLen += 4 + len(item) // 4 bytes for length + message data
+	if m.Address != nil {
+		binary.LittleEndian.PutUint32(buf[privateTableStart+16:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+		nestedData, err := m.Address.MarshalSymphony()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal nested message: %w", err)
+		}
+		nestedSize := len(nestedData)
+		binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(nestedSize))
+		copy(buf[privatePayloadStart+privatePayloadOffset+4:], nestedData)
+		privatePayloadOffset += 4 + nestedSize
+	} else {
+		binary.LittleEndian.PutUint32(buf[privateTableStart+16:], 0)
 	}
-	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
-	buf = append(buf, temp[:2]...)
-	offset += totalLen
 
-	// === DATA REGION SECTION ===
-
-	// Write string or bytes field (Id)
-	buf = append(buf, []byte(m.Id)...)
-
-	// Write string or bytes field (Name)
-	buf = append(buf, []byte(m.Name)...)
-
-	// Write string or bytes field (PhoneNumber)
-	buf = append(buf, []byte(m.PhoneNumber)...)
-
-	// Write string or bytes field (Description)
-	buf = append(buf, []byte(m.Description)...)
-
-	// Write nested message field (Address)
-	buf = append(buf, cachedSingularMessages[5]...)
-
-	// Write nested message field (Images)
-	for _, item := range cachedRepeatedMessages[6] {
-		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
-		buf = append(buf, temp[:4]...)
-		buf = append(buf, item...)
+	// Field 6 (Images): repeated nested message
+	binary.LittleEndian.PutUint32(buf[privateTableStart+20:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	count = len(m.Images)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(count))
+	privatePayloadOffset += 4
+	currentOffset = privatePayloadStart + privatePayloadOffset
+	for _, item := range m.Images {
+		nestedData, err := item.MarshalSymphony()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal nested message: %w", err)
+		}
+		nestedSize := len(nestedData)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(nestedSize))
+		copy(buf[currentOffset+4:], nestedData)
+		currentOffset += 4 + nestedSize
+		privatePayloadOffset += 4 + nestedSize
 	}
 
 	return buf, nil
 }
 
 func (m *Hotel) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 7 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+6]
-	offset += 6
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 30
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 6; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // Id
-			// Unmarshal string or []byte field (Id)
-			if entry, ok := offsets[1]; ok {
-				m.Id = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 2: // Name
-			// Unmarshal string or []byte field (Name)
-			if entry, ok := offsets[2]; ok {
-				m.Name = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 3: // PhoneNumber
-			// Unmarshal string or []byte field (PhoneNumber)
-			if entry, ok := offsets[3]; ok {
-				m.PhoneNumber = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 4: // Description
-			// Unmarshal string or []byte field (Description)
-			if entry, ok := offsets[4]; ok {
-				m.Description = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 5: // Address
-			// Unmarshal nested message field (Address)
-			if entry, ok := offsets[5]; ok {
-				if entry.length == 0 {
-					m.Address = nil
-				} else {
-					fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-					if m.Address == nil {
-						m.Address = &Address{}
-					}
-					if err := m.Address.UnmarshalSymphony(fieldData); err != nil {
-						return fmt.Errorf("failed to unmarshal singular nested message: %w", err)
-					}
-				}
-				dataOffset += int(entry.length)
-			}
-		case 6: // Images
-			// Unmarshal nested message field (Images)
-			if entry, ok := offsets[6]; ok {
-				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-				m.Images = make([]*Image, 0)
-				fieldOffset := 0
-				for fieldOffset < len(fieldData) {
-					if fieldOffset+4 > len(fieldData) {
-						return fmt.Errorf("insufficient data for item length")
-					}
-					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
-					fieldOffset += 4
-					if itemLen == 0 {
-						m.Images = append(m.Images, nil)
-						continue
-					}
-					if fieldOffset+int(itemLen) > len(fieldData) {
-						return fmt.Errorf("insufficient data for item bytes")
-					}
-					itemBytes := fieldData[fieldOffset : fieldOffset+int(itemLen)]
-					fieldOffset += int(itemLen)
-					newItem := &Image{}
-					if err := newItem.UnmarshalSymphony(itemBytes); err != nil {
-						return fmt.Errorf("failed to unmarshal nested message: %w", err)
-					}
-					m.Images = append(m.Images, newItem)
-				}
-				dataOffset += int(entry.length)
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (Id): variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Id = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
 		}
 	}
+
+	// Field 2 (Name): variable-length
+	if len(data) >= privateTableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+4:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Name = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 3 (PhoneNumber): variable-length
+	if len(data) >= privateTableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+8:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.PhoneNumber = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 4 (Description): variable-length
+	if len(data) >= privateTableStart+12+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+12:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Description = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 5 (Address): nested message
+	if len(data) >= privateTableStart+16+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+16:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Address = &Address{}
+				if err := m.Address.UnmarshalSymphony(data[payloadOffset+4 : payloadOffset+4+dataLen]); err != nil {
+					return fmt.Errorf("failed to unmarshal nested message: %w", err)
+				}
+			}
+		}
+	}
+
+	// Field 6 (Images): repeated nested message
+	if len(data) >= privateTableStart+20+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+20:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.Images = make([]*Image, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						item := &Image{}
+						if err := item.UnmarshalSymphony(data[currentOffset+4 : currentOffset+4+itemLen]); err != nil {
+							return fmt.Errorf("failed to unmarshal nested message: %w", err)
+						}
+						m.Images = append(m.Images, item)
+						currentOffset += 4 + itemLen
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+type HotelRaw []byte
+
+func (m HotelRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *HotelRaw) UnmarshalSymphony(data []byte) error {
+	*m = HotelRaw(data)
+	return nil
+}
+
+func (m HotelRaw) GetId() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Id called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Id called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (Id): variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m HotelRaw) GetName() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Name called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Name called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (Name): variable-length
+	if len(m) < offsetToPrivate+5+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+5:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m HotelRaw) GetPhoneNumber() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter PhoneNumber called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter PhoneNumber called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 3 (PhoneNumber): variable-length
+	if len(m) < offsetToPrivate+9+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+9:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m HotelRaw) GetDescription() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Description called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Description called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 4 (Description): variable-length
+	if len(m) < offsetToPrivate+13+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+13:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m HotelRaw) GetAddress() AddressRaw {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Address called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Address called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 5 (Address): nested message
+	if len(m) < offsetToPrivate+17+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+17:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	nestedSize := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+nestedSize {
+		return nil
+	}
+	return AddressRaw(m[payloadOffset+4 : payloadOffset+4+nestedSize])
+}
+
+func (m HotelRaw) GetImages() []ImageRaw {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Images called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Images called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 6 (Images): repeated nested message
+	if len(m) < offsetToPrivate+21+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+21:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	count := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	result := make([]ImageRaw, count)
+	currentOffset := payloadOffset + 4
+	for i := 0; i < count; i++ {
+		if len(m) < currentOffset+4 {
+			return nil
+		}
+		nestedSize := int(binary.LittleEndian.Uint32(m[currentOffset:]))
+		if len(m) < currentOffset+4+nestedSize {
+			return nil
+		}
+		result[i] = ImageRaw(m[currentOffset+4 : currentOffset+4+nestedSize])
+		currentOffset += 4 + nestedSize
+	}
+	return result
+}
+
+func (m *HotelRaw) SetId(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Id called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Id called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (Id): variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Hotel
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Id = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = HotelRaw(newData)
+	return nil
+}
+
+func (m *HotelRaw) SetName(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Name called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Name called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (Name): variable-length
+	if len(*m) < offsetToPrivate+5+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+5:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Hotel
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Name = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = HotelRaw(newData)
+	return nil
+}
+
+func (m *HotelRaw) SetPhoneNumber(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter PhoneNumber called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter PhoneNumber called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 3 (PhoneNumber): variable-length
+	if len(*m) < offsetToPrivate+9+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+9:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Hotel
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.PhoneNumber = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = HotelRaw(newData)
+	return nil
+}
+
+func (m *HotelRaw) SetDescription(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Description called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Description called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 4 (Description): variable-length
+	if len(*m) < offsetToPrivate+13+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+13:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Hotel
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Description = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = HotelRaw(newData)
+	return nil
+}
+
+func (m *HotelRaw) SetAddress(v AddressRaw) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Address called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Address called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 5 (Address): nested message
+	if len(*m) < offsetToPrivate+17+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+17:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldNestedSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldNestedSize = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newNestedSize := len(v)
+	if oldPayloadOffset > 0 && newNestedSize <= oldNestedSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newNestedSize))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Hotel
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	if temp.Address == nil {
+		temp.Address = &Address{}
+	}
+	if err := temp.Address.UnmarshalSymphony([]byte(v)); err != nil {
+		return fmt.Errorf("failed to unmarshal nested message: %w", err)
+	}
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = HotelRaw(newData)
+	return nil
+}
+
+func (m *HotelRaw) SetImages(v []ImageRaw) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Images called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Images called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 6 (Images): repeated nested message
+	if len(*m) < offsetToPrivate+21+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+21:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldCount int
+	var oldDataSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldCount = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+		// Calculate old data size: 4 bytes count + for each item: 4 bytes size + data
+		oldDataSize = 4
+		currentOffset := oldPayloadOffset + 4
+		for i := 0; i < oldCount; i++ {
+			if len(*m) < currentOffset+4 {
+				break
+			}
+			itemSize := int(binary.LittleEndian.Uint32((*m)[currentOffset:]))
+			oldDataSize += 4 + itemSize
+			currentOffset += 4 + itemSize
+		}
+	}
+	newCount := len(v)
+	newDataSize := 4 // count
+	for _, item := range v {
+		newDataSize += 4 + len(item) // 4 bytes size + data
+	}
+	if oldPayloadOffset > 0 && newDataSize <= oldDataSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newCount))
+		currentOffset := oldPayloadOffset + 4
+		for _, item := range v {
+			itemSize := len(item)
+			binary.LittleEndian.PutUint32((*m)[currentOffset:], uint32(itemSize))
+			copy((*m)[currentOffset+4:], item)
+			currentOffset += 4 + itemSize
+		}
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Hotel
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Images = make([]*Image, len(v))
+	for i, rawItem := range v {
+		temp.Images[i] = &Image{}
+		if err := temp.Images[i].UnmarshalSymphony([]byte(rawItem)); err != nil {
+			return fmt.Errorf("failed to unmarshal nested message: %w", err)
+		}
+	}
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = HotelRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *Address) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *Address) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 32 // table
+	size += 4 + len(m.StreetNumber)
+	size += 4 + len(m.StreetName)
+	size += 4 + len(m.City)
+	size += 4 + len(m.State)
+	size += 4 + len(m.Country)
+	size += 4 + len(m.PostalCode)
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 32
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (StreetNumber): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.StreetNumber)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.StreetNumber)
+	payloadOffset += 4 + len(m.StreetNumber)
+
+	// Field 2 (StreetName): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+4:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.StreetName)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.StreetName)
+	payloadOffset += 4 + len(m.StreetName)
+
+	// Field 3 (City): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+8:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.City)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.City)
+	payloadOffset += 4 + len(m.City)
+
+	// Field 4 (State): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+12:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.State)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.State)
+	payloadOffset += 4 + len(m.State)
+
+	// Field 5 (Country): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+16:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Country)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Country)
+	payloadOffset += 4 + len(m.Country)
+
+	// Field 6 (PostalCode): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+20:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.PostalCode)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.PostalCode)
+	payloadOffset += 4 + len(m.PostalCode)
+
+	// Field 7 (Lat): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[tableStart+24:], math.Float32bits(m.Lat))
+
+	// Field 8 (Lon): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[tableStart+28:], math.Float32bits(m.Lon))
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *Address) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *Address) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (StreetNumber): variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.StreetNumber = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 2 (StreetName): variable-length
+	if len(data) >= tableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+4:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.StreetName = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 3 (City): variable-length
+	if len(data) >= tableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+8:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.City = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 4 (State): variable-length
+	if len(data) >= tableStart+12+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+12:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.State = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 5 (Country): variable-length
+	if len(data) >= tableStart+16+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+16:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Country = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 6 (PostalCode): variable-length
+	if len(data) >= tableStart+20+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+20:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.PostalCode = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 7 (Lat): fixed-length (4 bytes)
+	if len(data) < tableStart+28 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(data[tableStart+24:]))
+
+	// Field 8 (Lon): fixed-length (4 bytes)
+	if len(data) < tableStart+32 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(data[tableStart+28:]))
 
 	return nil
 }
 
 func (m *Address) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 298)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1  // version byte
+	size += 32 // table entries
+	// Field 1 (StreetNumber): variable-length payload
+	size += 4 + len(m.StreetNumber) // 4 bytes length prefix + data
+	// Field 2 (StreetName): variable-length payload
+	size += 4 + len(m.StreetName) // 4 bytes length prefix + data
+	// Field 3 (City): variable-length payload
+	size += 4 + len(m.City) // 4 bytes length prefix + data
+	// Field 4 (State): variable-length payload
+	size += 4 + len(m.State) // 4 bytes length prefix + data
+	// Field 5 (Country): variable-length payload
+	size += 4 + len(m.Country) // 4 bytes length prefix + data
+	// Field 6 (PostalCode): variable-length payload
+	size += 4 + len(m.PostalCode) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2, 3, 4, 5, 6, 7, 8}...)
+	buf := make([]byte, size)
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// Field 1 (StreetNumber): string or bytes
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of StreetNumber
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.StreetNumber)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.StreetNumber)
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
 
-	// Field 2 (StreetName): string or bytes
-	buf = append(buf, byte(2))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of StreetName
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.StreetName)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.StreetName)
+	// Calculate offset to private segment
+	publicSegmentSize := 13
 
-	// Field 3 (City): string or bytes
-	buf = append(buf, byte(3))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of City
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.City)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.City)
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
 
-	// Field 4 (State): string or bytes
-	buf = append(buf, byte(4))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of State
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.State)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.State)
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
 
-	// Field 5 (Country): string or bytes
-	buf = append(buf, byte(5))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Country
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Country)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Country)
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
 
-	// Field 6 (PostalCode): string or bytes
-	buf = append(buf, byte(6))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of PostalCode
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.PostalCode)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.PostalCode)
+	// Write private fields
+	privateTableStart := privateStart + 1 // 32 bytes table
+	privatePayloadStart := privateTableStart + 32
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
 
-	offset += 4 // Lat
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (StreetNumber): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.StreetNumber)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.StreetNumber)
+	privatePayloadOffset += 4 + len(m.StreetNumber)
 
-	offset += 4 // Lon
+	// Field 2 (StreetName): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+4:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.StreetName)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.StreetName)
+	privatePayloadOffset += 4 + len(m.StreetName)
 
-	// === DATA REGION SECTION ===
+	// Field 3 (City): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+8:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.City)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.City)
+	privatePayloadOffset += 4 + len(m.City)
 
-	// Write string or bytes field (StreetNumber)
-	buf = append(buf, []byte(m.StreetNumber)...)
+	// Field 4 (State): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+12:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.State)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.State)
+	privatePayloadOffset += 4 + len(m.State)
 
-	// Write string or bytes field (StreetName)
-	buf = append(buf, []byte(m.StreetName)...)
+	// Field 5 (Country): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+16:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Country)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Country)
+	privatePayloadOffset += 4 + len(m.Country)
 
-	// Write string or bytes field (City)
-	buf = append(buf, []byte(m.City)...)
+	// Field 6 (PostalCode): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+20:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.PostalCode)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.PostalCode)
+	privatePayloadOffset += 4 + len(m.PostalCode)
 
-	// Write string or bytes field (State)
-	buf = append(buf, []byte(m.State)...)
+	// Field 7 (Lat): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[privateTableStart+24:], math.Float32bits(m.Lat))
 
-	// Write string or bytes field (Country)
-	buf = append(buf, []byte(m.Country)...)
-
-	// Write string or bytes field (PostalCode)
-	buf = append(buf, []byte(m.PostalCode)...)
-
-	// Write fixed field (Lat)
-	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lat))
-	buf = append(buf, temp[:4]...)
-
-	// Write fixed field (Lon)
-	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lon))
-	buf = append(buf, temp[:4]...)
+	// Field 8 (Lon): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[privateTableStart+28:], math.Float32bits(m.Lon))
 
 	return buf, nil
 }
 
 func (m *Address) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 9 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+8]
-	offset += 8
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 30
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 6; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // StreetNumber
-			// Unmarshal string or []byte field (StreetNumber)
-			if entry, ok := offsets[1]; ok {
-				m.StreetNumber = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (StreetNumber): variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.StreetNumber = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 2: // StreetName
-			// Unmarshal string or []byte field (StreetName)
-			if entry, ok := offsets[2]; ok {
-				m.StreetName = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 3: // City
-			// Unmarshal string or []byte field (City)
-			if entry, ok := offsets[3]; ok {
-				m.City = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 4: // State
-			// Unmarshal string or []byte field (State)
-			if entry, ok := offsets[4]; ok {
-				m.State = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 5: // Country
-			// Unmarshal string or []byte field (Country)
-			if entry, ok := offsets[5]; ok {
-				m.Country = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 6: // PostalCode
-			// Unmarshal string or []byte field (PostalCode)
-			if entry, ok := offsets[6]; ok {
-				m.PostalCode = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 7: // Lat
-			// Unmarshal fixed field (Lat)
-			if dataOffset+4 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
-			}
-			m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
-			dataOffset += 4
-		case 8: // Lon
-			// Unmarshal fixed field (Lon)
-			if dataOffset+4 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
-			}
-			m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
-			dataOffset += 4
 		}
 	}
+
+	// Field 2 (StreetName): variable-length
+	if len(data) >= privateTableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+4:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.StreetName = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 3 (City): variable-length
+	if len(data) >= privateTableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+8:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.City = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 4 (State): variable-length
+	if len(data) >= privateTableStart+12+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+12:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.State = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 5 (Country): variable-length
+	if len(data) >= privateTableStart+16+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+16:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Country = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 6 (PostalCode): variable-length
+	if len(data) >= privateTableStart+20+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+20:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.PostalCode = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 7 (Lat): fixed-length (4 bytes)
+	if len(data) < privateTableStart+28 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(data[privateTableStart+24:]))
+
+	// Field 8 (Lon): fixed-length (4 bytes)
+	if len(data) < privateTableStart+32 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(data[privateTableStart+28:]))
+
+	return nil
+}
+
+type AddressRaw []byte
+
+func (m AddressRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *AddressRaw) UnmarshalSymphony(data []byte) error {
+	*m = AddressRaw(data)
+	return nil
+}
+
+func (m AddressRaw) GetStreetNumber() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter StreetNumber called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter StreetNumber called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (StreetNumber): variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m AddressRaw) GetStreetName() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter StreetName called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter StreetName called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (StreetName): variable-length
+	if len(m) < offsetToPrivate+5+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+5:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m AddressRaw) GetCity() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter City called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter City called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 3 (City): variable-length
+	if len(m) < offsetToPrivate+9+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+9:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m AddressRaw) GetState() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter State called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter State called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 4 (State): variable-length
+	if len(m) < offsetToPrivate+13+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+13:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m AddressRaw) GetCountry() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Country called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Country called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 5 (Country): variable-length
+	if len(m) < offsetToPrivate+17+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+17:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m AddressRaw) GetPostalCode() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter PostalCode called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter PostalCode called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 6 (PostalCode): variable-length
+	if len(m) < offsetToPrivate+21+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+21:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m AddressRaw) GetLat() float32 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Lat called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Lat called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 7 (Lat): fixed-length (4 bytes)
+	if len(m) < offsetToPrivate+25+4 {
+		return 0
+	}
+	return math.Float32frombits(binary.LittleEndian.Uint32(m[offsetToPrivate+25:]))
+}
+
+func (m AddressRaw) GetLon() float32 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Lon called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Lon called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 8 (Lon): fixed-length (4 bytes)
+	if len(m) < offsetToPrivate+29+4 {
+		return 0
+	}
+	return math.Float32frombits(binary.LittleEndian.Uint32(m[offsetToPrivate+29:]))
+}
+
+func (m *AddressRaw) SetStreetNumber(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter StreetNumber called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter StreetNumber called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (StreetNumber): variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Address
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.StreetNumber = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = AddressRaw(newData)
+	return nil
+}
+
+func (m *AddressRaw) SetStreetName(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter StreetName called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter StreetName called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (StreetName): variable-length
+	if len(*m) < offsetToPrivate+5+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+5:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Address
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.StreetName = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = AddressRaw(newData)
+	return nil
+}
+
+func (m *AddressRaw) SetCity(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter City called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter City called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 3 (City): variable-length
+	if len(*m) < offsetToPrivate+9+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+9:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Address
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.City = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = AddressRaw(newData)
+	return nil
+}
+
+func (m *AddressRaw) SetState(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter State called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter State called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 4 (State): variable-length
+	if len(*m) < offsetToPrivate+13+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+13:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Address
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.State = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = AddressRaw(newData)
+	return nil
+}
+
+func (m *AddressRaw) SetCountry(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Country called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Country called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 5 (Country): variable-length
+	if len(*m) < offsetToPrivate+17+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+17:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Address
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Country = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = AddressRaw(newData)
+	return nil
+}
+
+func (m *AddressRaw) SetPostalCode(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter PostalCode called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter PostalCode called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 6 (PostalCode): variable-length
+	if len(*m) < offsetToPrivate+21+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+21:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Address
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.PostalCode = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = AddressRaw(newData)
+	return nil
+}
+
+func (m *AddressRaw) SetLat(v float32) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Lat called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Lat called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 7 (Lat): fixed-length (4 bytes)
+	if len(*m) < offsetToPrivate+25+4 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint32((*m)[offsetToPrivate+25:], math.Float32bits(v))
+	return nil
+}
+
+func (m *AddressRaw) SetLon(v float32) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Lon called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Lon called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 8 (Lon): fixed-length (4 bytes)
+	if len(*m) < offsetToPrivate+29+4 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint32((*m)[offsetToPrivate+29:], math.Float32bits(v))
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *Image) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *Image) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 5 // table
+	size += 4 + len(m.Url)
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 5
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (Url): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Url)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Url)
+	payloadOffset += 4 + len(m.Url)
+
+	// Field 2 (Default): fixed-length (1 bytes)
+	if m.Default {
+		buf[tableStart+4] = 1
+	} else {
+		buf[tableStart+4] = 0
+	}
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *Image) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *Image) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (Url): variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Url = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 2 (Default): fixed-length (1 bytes)
+	if len(data) < tableStart+5 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Default = data[tableStart+4] != 0
 
 	return nil
 }
 
 func (m *Image) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 51)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1 // version byte
+	size += 5 // table entries
+	// Field 1 (Url): variable-length payload
+	size += 4 + len(m.Url) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2}...)
+	buf := make([]byte, size)
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// Field 1 (Url): string or bytes
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Url
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Url)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Url)
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
 
-	offset += 1 // Default
+	// Calculate offset to private segment
+	publicSegmentSize := 13
 
-	// === DATA REGION SECTION ===
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
 
-	// Write string or bytes field (Url)
-	buf = append(buf, []byte(m.Url)...)
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
 
-	// Write fixed field (Default)
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 5 bytes table
+	privatePayloadStart := privateTableStart + 5
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (Url): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Url)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Url)
+	privatePayloadOffset += 4 + len(m.Url)
+
+	// Field 2 (Default): fixed-length (1 bytes)
 	if m.Default {
-		buf = append(buf, 1)
+		buf[privateTableStart+4] = 1
 	} else {
-		buf = append(buf, 0)
+		buf[privateTableStart+4] = 0
 	}
 
 	return buf, nil
 }
 
 func (m *Image) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 3 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+2]
-	offset += 2
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 5
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 1; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // Url
-			// Unmarshal string or []byte field (Url)
-			if entry, ok := offsets[1]; ok {
-				m.Url = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (Url): variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Url = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 2: // Default
-			// Unmarshal fixed field (Default)
-			if dataOffset+1 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
-			}
-			m.Default = dataRegion[dataOffset] != 0
-			dataOffset += 1
 		}
 	}
+
+	// Field 2 (Default): fixed-length (1 bytes)
+	if len(data) < privateTableStart+5 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Default = data[privateTableStart+4] != 0
+
+	return nil
+}
+
+type ImageRaw []byte
+
+func (m ImageRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *ImageRaw) UnmarshalSymphony(data []byte) error {
+	*m = ImageRaw(data)
+	return nil
+}
+
+func (m ImageRaw) GetUrl() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Url called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Url called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (Url): variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m ImageRaw) GetDefault() bool {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Default called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Default called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (Default): fixed-length (1 bytes)
+	if len(m) < offsetToPrivate+5+1 {
+		return false
+	}
+	return m[offsetToPrivate+5] != 0
+}
+
+func (m *ImageRaw) SetUrl(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Url called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Url called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (Url): variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp Image
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Url = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = ImageRaw(newData)
+	return nil
+}
+
+func (m *ImageRaw) SetDefault(v bool) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Default called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Default called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (Default): fixed-length (1 bytes)
+	if len(*m) < offsetToPrivate+5+1 {
+		return fmt.Errorf("buffer too short")
+	}
+	if v {
+		(*m)[offsetToPrivate+5] = 1
+	} else {
+		(*m)[offsetToPrivate+5] = 0
+	}
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *GetRecommendationsRequest) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *GetRecommendationsRequest) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 20 // table
+	size += 4 + len(m.Require)
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 20
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (Require): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Require)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Require)
+	payloadOffset += 4 + len(m.Require)
+
+	// Field 2 (Lat): fixed-length (8 bytes)
+	binary.LittleEndian.PutUint64(buf[tableStart+4:], math.Float64bits(m.Lat))
+
+	// Field 3 (Lon): fixed-length (8 bytes)
+	binary.LittleEndian.PutUint64(buf[tableStart+12:], math.Float64bits(m.Lon))
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *GetRecommendationsRequest) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *GetRecommendationsRequest) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (Require): variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Require = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 2 (Lat): fixed-length (8 bytes)
+	if len(data) < tableStart+12 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lat = math.Float64frombits(binary.LittleEndian.Uint64(data[tableStart+4:]))
+
+	// Field 3 (Lon): fixed-length (8 bytes)
+	if len(data) < tableStart+20 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lon = math.Float64frombits(binary.LittleEndian.Uint64(data[tableStart+12:]))
 
 	return nil
 }
 
 func (m *GetRecommendationsRequest) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 71)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1  // version byte
+	size += 20 // table entries
+	// Field 1 (Require): variable-length payload
+	size += 4 + len(m.Require) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2, 3}...)
+	buf := make([]byte, size)
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// Field 1 (Require): string or bytes
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Require
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Require)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Require)
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
 
-	offset += 8 // Lat
+	// Calculate offset to private segment
+	publicSegmentSize := 13
 
-	offset += 8 // Lon
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
 
-	// === DATA REGION SECTION ===
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
 
-	// Write string or bytes field (Require)
-	buf = append(buf, []byte(m.Require)...)
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
 
-	// Write fixed field (Lat)
-	binary.LittleEndian.PutUint64(temp[:8], math.Float64bits(m.Lat))
-	buf = append(buf, temp[:8]...)
+	// Write private fields
+	privateTableStart := privateStart + 1 // 20 bytes table
+	privatePayloadStart := privateTableStart + 20
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
 
-	// Write fixed field (Lon)
-	binary.LittleEndian.PutUint64(temp[:8], math.Float64bits(m.Lon))
-	buf = append(buf, temp[:8]...)
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (Require): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Require)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Require)
+	privatePayloadOffset += 4 + len(m.Require)
+
+	// Field 2 (Lat): fixed-length (8 bytes)
+	binary.LittleEndian.PutUint64(buf[privateTableStart+4:], math.Float64bits(m.Lat))
+
+	// Field 3 (Lon): fixed-length (8 bytes)
+	binary.LittleEndian.PutUint64(buf[privateTableStart+12:], math.Float64bits(m.Lon))
 
 	return buf, nil
 }
 
 func (m *GetRecommendationsRequest) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 4 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+3]
-	offset += 3
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 5
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 1; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // Require
-			// Unmarshal string or []byte field (Require)
-			if entry, ok := offsets[1]; ok {
-				m.Require = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (Require): variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Require = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 2: // Lat
-			// Unmarshal fixed field (Lat)
-			if dataOffset+8 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
+		}
+	}
+
+	// Field 2 (Lat): fixed-length (8 bytes)
+	if len(data) < privateTableStart+12 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lat = math.Float64frombits(binary.LittleEndian.Uint64(data[privateTableStart+4:]))
+
+	// Field 3 (Lon): fixed-length (8 bytes)
+	if len(data) < privateTableStart+20 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lon = math.Float64frombits(binary.LittleEndian.Uint64(data[privateTableStart+12:]))
+
+	return nil
+}
+
+type GetRecommendationsRequestRaw []byte
+
+func (m GetRecommendationsRequestRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *GetRecommendationsRequestRaw) UnmarshalSymphony(data []byte) error {
+	*m = GetRecommendationsRequestRaw(data)
+	return nil
+}
+
+func (m GetRecommendationsRequestRaw) GetRequire() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Require called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Require called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (Require): variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m GetRecommendationsRequestRaw) GetLat() float64 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Lat called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Lat called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (Lat): fixed-length (8 bytes)
+	if len(m) < offsetToPrivate+5+8 {
+		return 0
+	}
+	return math.Float64frombits(binary.LittleEndian.Uint64(m[offsetToPrivate+5:]))
+}
+
+func (m GetRecommendationsRequestRaw) GetLon() float64 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Lon called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Lon called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 3 (Lon): fixed-length (8 bytes)
+	if len(m) < offsetToPrivate+13+8 {
+		return 0
+	}
+	return math.Float64frombits(binary.LittleEndian.Uint64(m[offsetToPrivate+13:]))
+}
+
+func (m *GetRecommendationsRequestRaw) SetRequire(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Require called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Require called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (Require): variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp GetRecommendationsRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Require = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = GetRecommendationsRequestRaw(newData)
+	return nil
+}
+
+func (m *GetRecommendationsRequestRaw) SetLat(v float64) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Lat called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Lat called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (Lat): fixed-length (8 bytes)
+	if len(*m) < offsetToPrivate+5+8 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint64((*m)[offsetToPrivate+5:], math.Float64bits(v))
+	return nil
+}
+
+func (m *GetRecommendationsRequestRaw) SetLon(v float64) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Lon called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Lon called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 3 (Lon): fixed-length (8 bytes)
+	if len(*m) < offsetToPrivate+13+8 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint64((*m)[offsetToPrivate+13:], math.Float64bits(v))
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *GetRecommendationsResult) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *GetRecommendationsResult) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 4 // table
+	size += 4 // count for HotelIds
+	for _, item := range m.HotelIds {
+		size += 4 + len(item)
+	}
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 4
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (HotelIds): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	count = len(m.HotelIds)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(count))
+	currentOffset = payloadStart + payloadOffset + 4
+	for _, item := range m.HotelIds {
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	payloadOffset += 4 // count
+	for _, item := range m.HotelIds {
+		payloadOffset += 4 + len(item)
+	}
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *GetRecommendationsResult) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *GetRecommendationsResult) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (HotelIds): repeated variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelIds = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelIds = append(m.HotelIds, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
+					}
+				}
 			}
-			m.Lat = math.Float64frombits(binary.LittleEndian.Uint64(dataRegion[dataOffset : dataOffset+8]))
-			dataOffset += 8
-		case 3: // Lon
-			// Unmarshal fixed field (Lon)
-			if dataOffset+8 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
-			}
-			m.Lon = math.Float64frombits(binary.LittleEndian.Uint64(dataRegion[dataOffset : dataOffset+8]))
-			dataOffset += 8
 		}
 	}
 
@@ -1054,100 +4420,375 @@ func (m *GetRecommendationsRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetRecommendationsResult) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 48)
-	var temp [8]byte // Reusable temp buffer for encoding
-
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1}...)
-
-	// === OFFSET TABLE SECTION ===
-	offset := 0
-
-	// Field 1 (HotelIds): repeated variable-length
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelIds
-	buf = append(buf, temp[:2]...)
-	totalLen := 0
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1 // version byte
+	size += 4 // table entries
+	// Field 1 (HotelIds): repeated variable-length payload
+	size += 4 // count
 	for _, item := range m.HotelIds {
-		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
+		size += 4 + len(item) // 4 bytes length prefix + data
 	}
-	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
-	buf = append(buf, temp[:2]...)
-	offset += totalLen
 
-	// === DATA REGION SECTION ===
+	buf := make([]byte, size)
 
-	// Write repeated variable-length field (HotelIds)
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
+
+	// Calculate offset to private segment
+	publicSegmentSize := 13
+
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 4 bytes table
+	privatePayloadStart := privateTableStart + 4
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (HotelIds): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	count = len(m.HotelIds)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(count))
+	currentOffset = privatePayloadStart + privatePayloadOffset + 4
 	for _, item := range m.HotelIds {
-		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
-		buf = append(buf, temp[:4]...)
-		buf = append(buf, []byte(item)...)
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	privatePayloadOffset += 4 // count
+	for _, item := range m.HotelIds {
+		privatePayloadOffset += 4 + len(item)
 	}
 
 	return buf, nil
 }
 
 func (m *GetRecommendationsResult) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 2 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+1]
-	offset += 1
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 5
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 1; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // HotelIds
-			// Unmarshal repeated variable-length field (HotelIds)
-			if entry, ok := offsets[1]; ok {
-				m.HotelIds = make([]string, 0)
-				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-				fieldOffset := 0
-				for fieldOffset < len(fieldData) {
-					if fieldOffset+4 > len(fieldData) {
-						return fmt.Errorf("insufficient data for item length")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (HotelIds): repeated variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelIds = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelIds = append(m.HotelIds, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
 					}
-					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
-					fieldOffset += 4
-					if itemLen == 0 {
-						m.HotelIds = append(m.HotelIds, "")
-						continue
-					}
-					if fieldOffset+int(itemLen) > len(fieldData) {
-						return fmt.Errorf("insufficient data for item data")
-					}
-					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
-					fieldOffset += int(itemLen)
-					m.HotelIds = append(m.HotelIds, string(itemData))
 				}
-				dataOffset += int(entry.length)
+			}
+		}
+	}
+
+	return nil
+}
+
+type GetRecommendationsResultRaw []byte
+
+func (m GetRecommendationsResultRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *GetRecommendationsResultRaw) UnmarshalSymphony(data []byte) error {
+	*m = GetRecommendationsResultRaw(data)
+	return nil
+}
+
+func (m GetRecommendationsResultRaw) GetHotelIds() []string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter HotelIds called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter HotelIds called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (HotelIds): repeated variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	count := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	result := make([]string, count)
+	currentOffset := payloadOffset + 4
+	for i := 0; i < count; i++ {
+		if len(m) < currentOffset+4 {
+			return nil
+		}
+		itemLen := int(binary.LittleEndian.Uint32(m[currentOffset:]))
+		if len(m) < currentOffset+4+itemLen {
+			return nil
+		}
+		result[i] = string(m[currentOffset+4 : currentOffset+4+itemLen])
+		currentOffset += 4 + itemLen
+	}
+	return result
+}
+
+func (m *GetRecommendationsResultRaw) SetHotelIds(v []string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter HotelIds called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter HotelIds called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (HotelIds): repeated variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldCount int
+	var oldDataSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldCount = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+		// Calculate old data size: 4 bytes count + for each item: 4 bytes length + data
+		oldDataSize = 4
+		currentOffset := oldPayloadOffset + 4
+		for i := 0; i < oldCount; i++ {
+			if len(*m) < currentOffset+4 {
+				break
+			}
+			itemLen := int(binary.LittleEndian.Uint32((*m)[currentOffset:]))
+			oldDataSize += 4 + itemLen
+			currentOffset += 4 + itemLen
+		}
+	}
+	newCount := len(v)
+	newDataSize := 4 // count
+	for _, item := range v {
+		newDataSize += 4 + len(item) // 4 bytes length + data
+	}
+	if oldPayloadOffset > 0 && newDataSize <= oldDataSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newCount))
+		currentOffset := oldPayloadOffset + 4
+		for _, item := range v {
+			itemLen := len(item)
+			binary.LittleEndian.PutUint32((*m)[currentOffset:], uint32(itemLen))
+			copy((*m)[currentOffset+4:], item)
+			currentOffset += 4 + itemLen
+		}
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp GetRecommendationsResult
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.HotelIds = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = GetRecommendationsResultRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *GetRatesRequest) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *GetRatesRequest) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 12 // table
+	size += 4  // count for HotelIds
+	for _, item := range m.HotelIds {
+		size += 4 + len(item)
+	}
+	size += 4 + len(m.InDate)
+	size += 4 + len(m.OutDate)
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 12
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (HotelIds): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	count = len(m.HotelIds)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(count))
+	currentOffset = payloadStart + payloadOffset + 4
+	for _, item := range m.HotelIds {
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	payloadOffset += 4 // count
+	for _, item := range m.HotelIds {
+		payloadOffset += 4 + len(item)
+	}
+
+	// Field 2 (InDate): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+4:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.InDate)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.InDate)
+	payloadOffset += 4 + len(m.InDate)
+
+	// Field 3 (OutDate): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+8:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.OutDate)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.OutDate)
+	payloadOffset += 4 + len(m.OutDate)
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *GetRatesRequest) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *GetRatesRequest) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (HotelIds): repeated variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelIds = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelIds = append(m.HotelIds, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
+					}
+				}
+			}
+		}
+	}
+
+	// Field 2 (InDate): variable-length
+	if len(data) >= tableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+4:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.InDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 3 (OutDate): variable-length
+	if len(data) >= tableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+8:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.OutDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
 		}
 	}
@@ -1156,134 +4797,546 @@ func (m *GetRecommendationsResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetRatesRequest) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 143)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1  // version byte
+	size += 12 // table entries
+	// Field 1 (HotelIds): repeated variable-length payload
+	size += 4 // count
+	for _, item := range m.HotelIds {
+		size += 4 + len(item) // 4 bytes length prefix + data
+	}
+	// Field 2 (InDate): variable-length payload
+	size += 4 + len(m.InDate) // 4 bytes length prefix + data
+	// Field 3 (OutDate): variable-length payload
+	size += 4 + len(m.OutDate) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2, 3}...)
+	buf := make([]byte, size)
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
+
+	// Calculate offset to private segment
+	publicSegmentSize := 13
+
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 12 bytes table
+	privatePayloadStart := privateTableStart + 12
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
 	// Field 1 (HotelIds): repeated variable-length
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelIds
-	buf = append(buf, temp[:2]...)
-	totalLen := 0
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	count = len(m.HotelIds)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(count))
+	currentOffset = privatePayloadStart + privatePayloadOffset + 4
 	for _, item := range m.HotelIds {
-		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
 	}
-	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
-	buf = append(buf, temp[:2]...)
-	offset += totalLen
-
-	// Field 2 (InDate): string or bytes
-	buf = append(buf, byte(2))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of InDate
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.InDate)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.InDate)
-
-	// Field 3 (OutDate): string or bytes
-	buf = append(buf, byte(3))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of OutDate
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.OutDate)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.OutDate)
-
-	// === DATA REGION SECTION ===
-
-	// Write repeated variable-length field (HotelIds)
+	privatePayloadOffset += 4 // count
 	for _, item := range m.HotelIds {
-		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
-		buf = append(buf, temp[:4]...)
-		buf = append(buf, []byte(item)...)
+		privatePayloadOffset += 4 + len(item)
 	}
 
-	// Write string or bytes field (InDate)
-	buf = append(buf, []byte(m.InDate)...)
+	// Field 2 (InDate): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+4:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.InDate)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.InDate)
+	privatePayloadOffset += 4 + len(m.InDate)
 
-	// Write string or bytes field (OutDate)
-	buf = append(buf, []byte(m.OutDate)...)
+	// Field 3 (OutDate): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+8:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.OutDate)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.OutDate)
+	privatePayloadOffset += 4 + len(m.OutDate)
 
 	return buf, nil
 }
 
 func (m *GetRatesRequest) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 4 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+3]
-	offset += 3
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 15
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 3; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // HotelIds
-			// Unmarshal repeated variable-length field (HotelIds)
-			if entry, ok := offsets[1]; ok {
-				m.HotelIds = make([]string, 0)
-				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-				fieldOffset := 0
-				for fieldOffset < len(fieldData) {
-					if fieldOffset+4 > len(fieldData) {
-						return fmt.Errorf("insufficient data for item length")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (HotelIds): repeated variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelIds = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelIds = append(m.HotelIds, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
 					}
-					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
-					fieldOffset += 4
-					if itemLen == 0 {
-						m.HotelIds = append(m.HotelIds, "")
-						continue
-					}
-					if fieldOffset+int(itemLen) > len(fieldData) {
-						return fmt.Errorf("insufficient data for item data")
-					}
-					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
-					fieldOffset += int(itemLen)
-					m.HotelIds = append(m.HotelIds, string(itemData))
 				}
-				dataOffset += int(entry.length)
 			}
-		case 2: // InDate
-			// Unmarshal string or []byte field (InDate)
-			if entry, ok := offsets[2]; ok {
-				m.InDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	// Field 2 (InDate): variable-length
+	if len(data) >= privateTableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+4:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.InDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 3: // OutDate
-			// Unmarshal string or []byte field (OutDate)
-			if entry, ok := offsets[3]; ok {
-				m.OutDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	// Field 3 (OutDate): variable-length
+	if len(data) >= privateTableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+8:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.OutDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	return nil
+}
+
+type GetRatesRequestRaw []byte
+
+func (m GetRatesRequestRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *GetRatesRequestRaw) UnmarshalSymphony(data []byte) error {
+	*m = GetRatesRequestRaw(data)
+	return nil
+}
+
+func (m GetRatesRequestRaw) GetHotelIds() []string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter HotelIds called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter HotelIds called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (HotelIds): repeated variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	count := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	result := make([]string, count)
+	currentOffset := payloadOffset + 4
+	for i := 0; i < count; i++ {
+		if len(m) < currentOffset+4 {
+			return nil
+		}
+		itemLen := int(binary.LittleEndian.Uint32(m[currentOffset:]))
+		if len(m) < currentOffset+4+itemLen {
+			return nil
+		}
+		result[i] = string(m[currentOffset+4 : currentOffset+4+itemLen])
+		currentOffset += 4 + itemLen
+	}
+	return result
+}
+
+func (m GetRatesRequestRaw) GetInDate() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter InDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter InDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (InDate): variable-length
+	if len(m) < offsetToPrivate+5+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+5:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m GetRatesRequestRaw) GetOutDate() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter OutDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter OutDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 3 (OutDate): variable-length
+	if len(m) < offsetToPrivate+9+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+9:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m *GetRatesRequestRaw) SetHotelIds(v []string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter HotelIds called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter HotelIds called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (HotelIds): repeated variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldCount int
+	var oldDataSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldCount = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+		// Calculate old data size: 4 bytes count + for each item: 4 bytes length + data
+		oldDataSize = 4
+		currentOffset := oldPayloadOffset + 4
+		for i := 0; i < oldCount; i++ {
+			if len(*m) < currentOffset+4 {
+				break
+			}
+			itemLen := int(binary.LittleEndian.Uint32((*m)[currentOffset:]))
+			oldDataSize += 4 + itemLen
+			currentOffset += 4 + itemLen
+		}
+	}
+	newCount := len(v)
+	newDataSize := 4 // count
+	for _, item := range v {
+		newDataSize += 4 + len(item) // 4 bytes length + data
+	}
+	if oldPayloadOffset > 0 && newDataSize <= oldDataSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newCount))
+		currentOffset := oldPayloadOffset + 4
+		for _, item := range v {
+			itemLen := len(item)
+			binary.LittleEndian.PutUint32((*m)[currentOffset:], uint32(itemLen))
+			copy((*m)[currentOffset+4:], item)
+			currentOffset += 4 + itemLen
+		}
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp GetRatesRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.HotelIds = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = GetRatesRequestRaw(newData)
+	return nil
+}
+
+func (m *GetRatesRequestRaw) SetInDate(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter InDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter InDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (InDate): variable-length
+	if len(*m) < offsetToPrivate+5+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+5:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp GetRatesRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.InDate = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = GetRatesRequestRaw(newData)
+	return nil
+}
+
+func (m *GetRatesRequestRaw) SetOutDate(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter OutDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter OutDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 3 (OutDate): variable-length
+	if len(*m) < offsetToPrivate+9+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+9:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp GetRatesRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.OutDate = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = GetRatesRequestRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *GetRatesResult) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *GetRatesResult) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 4 // table
+	size += 4 // count for RatePlans
+	for _, item := range m.RatePlans {
+		nested, _ := item.MarshalSymphony()
+		size += 4 + len(nested)
+	}
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 4
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (RatePlans): repeated nested message
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	count = len(m.RatePlans)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(count))
+	payloadOffset += 4
+	currentOffset = payloadStart + payloadOffset
+	for _, item := range m.RatePlans {
+		nestedData, err := item.MarshalSymphony()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal nested message: %w", err)
+		}
+		nestedSize := len(nestedData)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(nestedSize))
+		copy(buf[currentOffset+4:], nestedData)
+		currentOffset += 4 + nestedSize
+		payloadOffset += 4 + nestedSize
+	}
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *GetRatesResult) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *GetRatesResult) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (RatePlans): repeated nested message
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.RatePlans = make([]*RatePlan, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						item := &RatePlan{}
+						if err := item.UnmarshalSymphony(data[currentOffset+4 : currentOffset+4+itemLen]); err != nil {
+							return fmt.Errorf("failed to unmarshal nested message: %w", err)
+						}
+						m.RatePlans = append(m.RatePlans, item)
+						currentOffset += 4 + itemLen
+					}
+				}
 			}
 		}
 	}
@@ -1292,119 +5345,453 @@ func (m *GetRatesRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *GetRatesResult) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 88)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1 // version byte
+	size += 4 // table entries
+	// Field 1 (RatePlans): repeated nested message payload
+	size += 4 // count
+	for _, item := range m.RatePlans {
+		nestedSize1 := 0
+		// Public segment:
+		nestedSize1 += 1  // version byte
+		nestedSize1 += 12 // reserved: offset_to_private, service_name, method_name
+		// Private segment:
+		nestedSize1 += 1  // version byte
+		nestedSize1 += 20 // table entries
+		// Field 1 (HotelId): variable-length payload
+		nestedSize1 += 4 + len(item.HotelId) // 4 bytes length prefix + data
+		// Field 2 (Code): variable-length payload
+		nestedSize1 += 4 + len(item.Code) // 4 bytes length prefix + data
+		// Field 3 (InDate): variable-length payload
+		nestedSize1 += 4 + len(item.InDate) // 4 bytes length prefix + data
+		// Field 4 (OutDate): variable-length payload
+		nestedSize1 += 4 + len(item.OutDate) // 4 bytes length prefix + data
+		// Field 5 (RoomType): nested message payload
+		if item.RoomType != nil {
+			nestedSize2 := 0
+			// Public segment:
+			nestedSize2 += 1  // version byte
+			nestedSize2 += 12 // reserved: offset_to_private, service_name, method_name
+			// Private segment:
+			nestedSize2 += 1  // version byte
+			nestedSize2 += 36 // table entries
+			// Field 4 (Code): variable-length payload
+			nestedSize2 += 4 + len(item.RoomType.Code) // 4 bytes length prefix + data
+			// Field 5 (Currency): variable-length payload
+			nestedSize2 += 4 + len(item.RoomType.Currency) // 4 bytes length prefix + data
+			// Field 6 (RoomDescription): variable-length payload
+			nestedSize2 += 4 + len(item.RoomType.RoomDescription) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1}...)
-
-	// === PRE-MARSHAL/CACHE SECTION FOR NESTED MESSAGES ===
-
-	var err error
-	cachedRepeatedMessages := make(map[byte][][]byte)
-	// Cache field 1 (RatePlans): repeated message
-	cachedRepeatedMessages[1] = make([][]byte, len(m.RatePlans))
-	for i, item := range m.RatePlans {
-		if item != nil {
-			cachedRepeatedMessages[1][i], err = item.MarshalSymphony()
+			nestedSize1 += 4 + nestedSize2 // 4 bytes size + message data
 		}
+
+		size += 4 + nestedSize1 // 4 bytes size + message data
+	}
+
+	buf := make([]byte, size)
+
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
+
+	// Calculate offset to private segment
+	publicSegmentSize := 13
+
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 4 bytes table
+	privatePayloadStart := privateTableStart + 4
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (RatePlans): repeated nested message
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	count = len(m.RatePlans)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(count))
+	privatePayloadOffset += 4
+	currentOffset = privatePayloadStart + privatePayloadOffset
+	for _, item := range m.RatePlans {
+		nestedData, err := item.MarshalSymphony()
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal repeated message field RatePlans[%d]: %w", i, err)
+			return nil, fmt.Errorf("failed to marshal nested message: %w", err)
 		}
-	}
-
-	// === OFFSET TABLE SECTION ===
-	offset := 0
-
-	// Field 1 (RatePlans): nested message
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset))
-	buf = append(buf, temp[:2]...)
-	totalLen := 0
-	for _, item := range cachedRepeatedMessages[1] {
-		totalLen += 4 + len(item) // 4 bytes for length + message data
-	}
-	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
-	buf = append(buf, temp[:2]...)
-	offset += totalLen
-
-	// === DATA REGION SECTION ===
-
-	// Write nested message field (RatePlans)
-	for _, item := range cachedRepeatedMessages[1] {
-		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
-		buf = append(buf, temp[:4]...)
-		buf = append(buf, item...)
+		nestedSize := len(nestedData)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(nestedSize))
+		copy(buf[currentOffset+4:], nestedData)
+		currentOffset += 4 + nestedSize
+		privatePayloadOffset += 4 + nestedSize
 	}
 
 	return buf, nil
 }
 
 func (m *GetRatesResult) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 2 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+1]
-	offset += 1
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 5
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 1; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // RatePlans
-			// Unmarshal nested message field (RatePlans)
-			if entry, ok := offsets[1]; ok {
-				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-				m.RatePlans = make([]*RatePlan, 0)
-				fieldOffset := 0
-				for fieldOffset < len(fieldData) {
-					if fieldOffset+4 > len(fieldData) {
-						return fmt.Errorf("insufficient data for item length")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (RatePlans): repeated nested message
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.RatePlans = make([]*RatePlan, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						item := &RatePlan{}
+						if err := item.UnmarshalSymphony(data[currentOffset+4 : currentOffset+4+itemLen]); err != nil {
+							return fmt.Errorf("failed to unmarshal nested message: %w", err)
+						}
+						m.RatePlans = append(m.RatePlans, item)
+						currentOffset += 4 + itemLen
 					}
-					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
-					fieldOffset += 4
-					if itemLen == 0 {
-						m.RatePlans = append(m.RatePlans, nil)
-						continue
-					}
-					if fieldOffset+int(itemLen) > len(fieldData) {
-						return fmt.Errorf("insufficient data for item bytes")
-					}
-					itemBytes := fieldData[fieldOffset : fieldOffset+int(itemLen)]
-					fieldOffset += int(itemLen)
-					newItem := &RatePlan{}
-					if err := newItem.UnmarshalSymphony(itemBytes); err != nil {
-						return fmt.Errorf("failed to unmarshal nested message: %w", err)
-					}
-					m.RatePlans = append(m.RatePlans, newItem)
 				}
-				dataOffset += int(entry.length)
+			}
+		}
+	}
+
+	return nil
+}
+
+type GetRatesResultRaw []byte
+
+func (m GetRatesResultRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *GetRatesResultRaw) UnmarshalSymphony(data []byte) error {
+	*m = GetRatesResultRaw(data)
+	return nil
+}
+
+func (m GetRatesResultRaw) GetRatePlans() []RatePlanRaw {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter RatePlans called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter RatePlans called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (RatePlans): repeated nested message
+	if len(m) < offsetToPrivate+1+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	count := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	result := make([]RatePlanRaw, count)
+	currentOffset := payloadOffset + 4
+	for i := 0; i < count; i++ {
+		if len(m) < currentOffset+4 {
+			return nil
+		}
+		nestedSize := int(binary.LittleEndian.Uint32(m[currentOffset:]))
+		if len(m) < currentOffset+4+nestedSize {
+			return nil
+		}
+		result[i] = RatePlanRaw(m[currentOffset+4 : currentOffset+4+nestedSize])
+		currentOffset += 4 + nestedSize
+	}
+	return result
+}
+
+func (m *GetRatesResultRaw) SetRatePlans(v []RatePlanRaw) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter RatePlans called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter RatePlans called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (RatePlans): repeated nested message
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldCount int
+	var oldDataSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldCount = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+		// Calculate old data size: 4 bytes count + for each item: 4 bytes size + data
+		oldDataSize = 4
+		currentOffset := oldPayloadOffset + 4
+		for i := 0; i < oldCount; i++ {
+			if len(*m) < currentOffset+4 {
+				break
+			}
+			itemSize := int(binary.LittleEndian.Uint32((*m)[currentOffset:]))
+			oldDataSize += 4 + itemSize
+			currentOffset += 4 + itemSize
+		}
+	}
+	newCount := len(v)
+	newDataSize := 4 // count
+	for _, item := range v {
+		newDataSize += 4 + len(item) // 4 bytes size + data
+	}
+	if oldPayloadOffset > 0 && newDataSize <= oldDataSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newCount))
+		currentOffset := oldPayloadOffset + 4
+		for _, item := range v {
+			itemSize := len(item)
+			binary.LittleEndian.PutUint32((*m)[currentOffset:], uint32(itemSize))
+			copy((*m)[currentOffset+4:], item)
+			currentOffset += 4 + itemSize
+		}
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp GetRatesResult
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.RatePlans = make([]*RatePlan, len(v))
+	for i, rawItem := range v {
+		temp.RatePlans[i] = &RatePlan{}
+		if err := temp.RatePlans[i].UnmarshalSymphony([]byte(rawItem)); err != nil {
+			return fmt.Errorf("failed to unmarshal nested message: %w", err)
+		}
+	}
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = GetRatesResultRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *RatePlan) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *RatePlan) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 20 // table
+	size += 4 + len(m.HotelId)
+	size += 4 + len(m.Code)
+	size += 4 + len(m.InDate)
+	size += 4 + len(m.OutDate)
+	if m.RoomType != nil {
+		nested, _ := m.RoomType.MarshalSymphony()
+		size += 4 + len(nested)
+	}
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 20
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (HotelId): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.HotelId)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.HotelId)
+	payloadOffset += 4 + len(m.HotelId)
+
+	// Field 2 (Code): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+4:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Code)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Code)
+	payloadOffset += 4 + len(m.Code)
+
+	// Field 3 (InDate): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+8:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.InDate)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.InDate)
+	payloadOffset += 4 + len(m.InDate)
+
+	// Field 4 (OutDate): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+12:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.OutDate)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.OutDate)
+	payloadOffset += 4 + len(m.OutDate)
+
+	// Field 5 (RoomType): nested message
+	if m.RoomType != nil {
+		binary.LittleEndian.PutUint32(buf[tableStart+16:], uint32(payloadStart+payloadOffset))
+		nestedData, err := m.RoomType.MarshalSymphony()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal nested message: %w", err)
+		}
+		nestedSize := len(nestedData)
+		binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(nestedSize))
+		copy(buf[payloadStart+payloadOffset+4:], nestedData)
+		payloadOffset += 4 + nestedSize
+	} else {
+		binary.LittleEndian.PutUint32(buf[tableStart+16:], 0)
+	}
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *RatePlan) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *RatePlan) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (HotelId): variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.HotelId = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 2 (Code): variable-length
+	if len(data) >= tableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+4:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Code = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 3 (InDate): variable-length
+	if len(data) >= tableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+8:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.InDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 4 (OutDate): variable-length
+	if len(data) >= tableStart+12+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+12:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.OutDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 5 (RoomType): nested message
+	if len(data) >= tableStart+16+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+16:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.RoomType = &RoomType{}
+				if err := m.RoomType.UnmarshalSymphony(data[payloadOffset+4 : payloadOffset+4+dataLen]); err != nil {
+					return fmt.Errorf("failed to unmarshal nested message: %w", err)
+				}
 			}
 		}
 	}
@@ -1413,163 +5800,766 @@ func (m *GetRatesResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *RatePlan) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 278)
-	var temp [8]byte // Reusable temp buffer for encoding
-
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2, 3, 4, 5}...)
-
-	// === PRE-MARSHAL/CACHE SECTION FOR NESTED MESSAGES ===
-
-	var err error
-	cachedSingularMessages := make(map[byte][]byte)
-	// Cache field 5 (RoomType): singular message
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1  // version byte
+	size += 20 // table entries
+	// Field 1 (HotelId): variable-length payload
+	size += 4 + len(m.HotelId) // 4 bytes length prefix + data
+	// Field 2 (Code): variable-length payload
+	size += 4 + len(m.Code) // 4 bytes length prefix + data
+	// Field 3 (InDate): variable-length payload
+	size += 4 + len(m.InDate) // 4 bytes length prefix + data
+	// Field 4 (OutDate): variable-length payload
+	size += 4 + len(m.OutDate) // 4 bytes length prefix + data
+	// Field 5 (RoomType): nested message payload
 	if m.RoomType != nil {
-		cachedSingularMessages[5], err = m.RoomType.MarshalSymphony()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal singular message field RoomType: %w", err)
-		}
+		nestedSize1 := 0
+		// Public segment:
+		nestedSize1 += 1  // version byte
+		nestedSize1 += 12 // reserved: offset_to_private, service_name, method_name
+		// Private segment:
+		nestedSize1 += 1  // version byte
+		nestedSize1 += 36 // table entries
+		// Field 4 (Code): variable-length payload
+		nestedSize1 += 4 + len(m.RoomType.Code) // 4 bytes length prefix + data
+		// Field 5 (Currency): variable-length payload
+		nestedSize1 += 4 + len(m.RoomType.Currency) // 4 bytes length prefix + data
+		// Field 6 (RoomDescription): variable-length payload
+		nestedSize1 += 4 + len(m.RoomType.RoomDescription) // 4 bytes length prefix + data
+
+		size += 4 + nestedSize1 // 4 bytes size + message data
 	}
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	buf := make([]byte, size)
 
-	// Field 1 (HotelId): string or bytes
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelId
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.HotelId)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.HotelId)
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// Field 2 (Code): string or bytes
-	buf = append(buf, byte(2))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Code
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Code)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Code)
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
 
-	// Field 3 (InDate): string or bytes
-	buf = append(buf, byte(3))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of InDate
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.InDate)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.InDate)
+	// Calculate offset to private segment
+	publicSegmentSize := 13
 
-	// Field 4 (OutDate): string or bytes
-	buf = append(buf, byte(4))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of OutDate
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.OutDate)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.OutDate)
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 20 bytes table
+	privatePayloadStart := privateTableStart + 20
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (HotelId): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.HotelId)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.HotelId)
+	privatePayloadOffset += 4 + len(m.HotelId)
+
+	// Field 2 (Code): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+4:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Code)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Code)
+	privatePayloadOffset += 4 + len(m.Code)
+
+	// Field 3 (InDate): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+8:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.InDate)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.InDate)
+	privatePayloadOffset += 4 + len(m.InDate)
+
+	// Field 4 (OutDate): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+12:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.OutDate)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.OutDate)
+	privatePayloadOffset += 4 + len(m.OutDate)
 
 	// Field 5 (RoomType): nested message
-	buf = append(buf, byte(5))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset))
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(cachedSingularMessages[5])))
-	buf = append(buf, temp[:2]...)
-	offset += len(cachedSingularMessages[5])
-
-	// === DATA REGION SECTION ===
-
-	// Write string or bytes field (HotelId)
-	buf = append(buf, []byte(m.HotelId)...)
-
-	// Write string or bytes field (Code)
-	buf = append(buf, []byte(m.Code)...)
-
-	// Write string or bytes field (InDate)
-	buf = append(buf, []byte(m.InDate)...)
-
-	// Write string or bytes field (OutDate)
-	buf = append(buf, []byte(m.OutDate)...)
-
-	// Write nested message field (RoomType)
-	buf = append(buf, cachedSingularMessages[5]...)
+	if m.RoomType != nil {
+		binary.LittleEndian.PutUint32(buf[privateTableStart+16:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+		nestedData, err := m.RoomType.MarshalSymphony()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal nested message: %w", err)
+		}
+		nestedSize := len(nestedData)
+		binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(nestedSize))
+		copy(buf[privatePayloadStart+privatePayloadOffset+4:], nestedData)
+		privatePayloadOffset += 4 + nestedSize
+	} else {
+		binary.LittleEndian.PutUint32(buf[privateTableStart+16:], 0)
+	}
 
 	return buf, nil
 }
 
 func (m *RatePlan) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 6 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+5]
-	offset += 5
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 25
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 5; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // HotelId
-			// Unmarshal string or []byte field (HotelId)
-			if entry, ok := offsets[1]; ok {
-				m.HotelId = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (HotelId): variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.HotelId = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 2: // Code
-			// Unmarshal string or []byte field (Code)
-			if entry, ok := offsets[2]; ok {
-				m.Code = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	// Field 2 (Code): variable-length
+	if len(data) >= privateTableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+4:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Code = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 3: // InDate
-			// Unmarshal string or []byte field (InDate)
-			if entry, ok := offsets[3]; ok {
-				m.InDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	// Field 3 (InDate): variable-length
+	if len(data) >= privateTableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+8:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.InDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 4: // OutDate
-			// Unmarshal string or []byte field (OutDate)
-			if entry, ok := offsets[4]; ok {
-				m.OutDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	// Field 4 (OutDate): variable-length
+	if len(data) >= privateTableStart+12+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+12:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.OutDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 5: // RoomType
-			// Unmarshal nested message field (RoomType)
-			if entry, ok := offsets[5]; ok {
-				if entry.length == 0 {
-					m.RoomType = nil
-				} else {
-					fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-					if m.RoomType == nil {
-						m.RoomType = &RoomType{}
-					}
-					if err := m.RoomType.UnmarshalSymphony(fieldData); err != nil {
-						return fmt.Errorf("failed to unmarshal singular nested message: %w", err)
-					}
+		}
+	}
+
+	// Field 5 (RoomType): nested message
+	if len(data) >= privateTableStart+16+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+16:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.RoomType = &RoomType{}
+				if err := m.RoomType.UnmarshalSymphony(data[payloadOffset+4 : payloadOffset+4+dataLen]); err != nil {
+					return fmt.Errorf("failed to unmarshal nested message: %w", err)
 				}
-				dataOffset += int(entry.length)
+			}
+		}
+	}
+
+	return nil
+}
+
+type RatePlanRaw []byte
+
+func (m RatePlanRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *RatePlanRaw) UnmarshalSymphony(data []byte) error {
+	*m = RatePlanRaw(data)
+	return nil
+}
+
+func (m RatePlanRaw) GetHotelId() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter HotelId called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter HotelId called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (HotelId): variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m RatePlanRaw) GetCode() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Code called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Code called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (Code): variable-length
+	if len(m) < offsetToPrivate+5+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+5:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m RatePlanRaw) GetInDate() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter InDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter InDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 3 (InDate): variable-length
+	if len(m) < offsetToPrivate+9+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+9:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m RatePlanRaw) GetOutDate() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter OutDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter OutDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 4 (OutDate): variable-length
+	if len(m) < offsetToPrivate+13+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+13:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m RatePlanRaw) GetRoomType() RoomTypeRaw {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter RoomType called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter RoomType called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 5 (RoomType): nested message
+	if len(m) < offsetToPrivate+17+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+17:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	nestedSize := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+nestedSize {
+		return nil
+	}
+	return RoomTypeRaw(m[payloadOffset+4 : payloadOffset+4+nestedSize])
+}
+
+func (m *RatePlanRaw) SetHotelId(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter HotelId called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter HotelId called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (HotelId): variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp RatePlan
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.HotelId = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = RatePlanRaw(newData)
+	return nil
+}
+
+func (m *RatePlanRaw) SetCode(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Code called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Code called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (Code): variable-length
+	if len(*m) < offsetToPrivate+5+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+5:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp RatePlan
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Code = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = RatePlanRaw(newData)
+	return nil
+}
+
+func (m *RatePlanRaw) SetInDate(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter InDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter InDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 3 (InDate): variable-length
+	if len(*m) < offsetToPrivate+9+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+9:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp RatePlan
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.InDate = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = RatePlanRaw(newData)
+	return nil
+}
+
+func (m *RatePlanRaw) SetOutDate(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter OutDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter OutDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 4 (OutDate): variable-length
+	if len(*m) < offsetToPrivate+13+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+13:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp RatePlan
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.OutDate = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = RatePlanRaw(newData)
+	return nil
+}
+
+func (m *RatePlanRaw) SetRoomType(v RoomTypeRaw) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter RoomType called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter RoomType called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 5 (RoomType): nested message
+	if len(*m) < offsetToPrivate+17+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+17:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldNestedSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldNestedSize = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newNestedSize := len(v)
+	if oldPayloadOffset > 0 && newNestedSize <= oldNestedSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newNestedSize))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp RatePlan
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	if temp.RoomType == nil {
+		temp.RoomType = &RoomType{}
+	}
+	if err := temp.RoomType.UnmarshalSymphony([]byte(v)); err != nil {
+		return fmt.Errorf("failed to unmarshal nested message: %w", err)
+	}
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = RatePlanRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *RoomType) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *RoomType) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 36 // table
+	size += 4 + len(m.Code)
+	size += 4 + len(m.Currency)
+	size += 4 + len(m.RoomDescription)
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 36
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (BookableRate): fixed-length (8 bytes)
+	binary.LittleEndian.PutUint64(buf[tableStart+0:], math.Float64bits(m.BookableRate))
+
+	// Field 2 (TotalRate): fixed-length (8 bytes)
+	binary.LittleEndian.PutUint64(buf[tableStart+8:], math.Float64bits(m.TotalRate))
+
+	// Field 3 (TotalRateInclusive): fixed-length (8 bytes)
+	binary.LittleEndian.PutUint64(buf[tableStart+16:], math.Float64bits(m.TotalRateInclusive))
+
+	// Field 4 (Code): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+24:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Code)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Code)
+	payloadOffset += 4 + len(m.Code)
+
+	// Field 5 (Currency): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+28:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Currency)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Currency)
+	payloadOffset += 4 + len(m.Currency)
+
+	// Field 6 (RoomDescription): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+32:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.RoomDescription)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.RoomDescription)
+	payloadOffset += 4 + len(m.RoomDescription)
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *RoomType) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *RoomType) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (BookableRate): fixed-length (8 bytes)
+	if len(data) < tableStart+8 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.BookableRate = math.Float64frombits(binary.LittleEndian.Uint64(data[tableStart+0:]))
+
+	// Field 2 (TotalRate): fixed-length (8 bytes)
+	if len(data) < tableStart+16 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.TotalRate = math.Float64frombits(binary.LittleEndian.Uint64(data[tableStart+8:]))
+
+	// Field 3 (TotalRateInclusive): fixed-length (8 bytes)
+	if len(data) < tableStart+24 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.TotalRateInclusive = math.Float64frombits(binary.LittleEndian.Uint64(data[tableStart+16:]))
+
+	// Field 4 (Code): variable-length
+	if len(data) >= tableStart+24+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+24:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Code = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 5 (Currency): variable-length
+	if len(data) >= tableStart+28+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+28:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Currency = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 6 (RoomDescription): variable-length
+	if len(data) >= tableStart+32+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+32:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.RoomDescription = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
 		}
 	}
@@ -1578,146 +6568,184 @@ func (m *RatePlan) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *RoomType) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 177)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1  // version byte
+	size += 36 // table entries
+	// Field 4 (Code): variable-length payload
+	size += 4 + len(m.Code) // 4 bytes length prefix + data
+	// Field 5 (Currency): variable-length payload
+	size += 4 + len(m.Currency) // 4 bytes length prefix + data
+	// Field 6 (RoomDescription): variable-length payload
+	size += 4 + len(m.RoomDescription) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2, 3, 4, 5, 6}...)
+	buf := make([]byte, size)
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	offset += 8 // BookableRate
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
 
-	offset += 8 // TotalRate
+	// Calculate offset to private segment
+	publicSegmentSize := 13
 
-	offset += 8 // TotalRateInclusive
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
 
-	// Field 4 (Code): string or bytes
-	buf = append(buf, byte(4))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Code
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Code)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Code)
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
 
-	// Field 5 (Currency): string or bytes
-	buf = append(buf, byte(5))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Currency
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Currency)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Currency)
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
 
-	// Field 6 (RoomDescription): string or bytes
-	buf = append(buf, byte(6))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of RoomDescription
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.RoomDescription)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.RoomDescription)
+	// Write private fields
+	privateTableStart := privateStart + 1 // 36 bytes table
+	privatePayloadStart := privateTableStart + 36
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
 
-	// === DATA REGION SECTION ===
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (BookableRate): fixed-length (8 bytes)
+	binary.LittleEndian.PutUint64(buf[privateTableStart+0:], math.Float64bits(m.BookableRate))
 
-	// Write fixed field (BookableRate)
-	binary.LittleEndian.PutUint64(temp[:8], math.Float64bits(m.BookableRate))
-	buf = append(buf, temp[:8]...)
+	// Field 2 (TotalRate): fixed-length (8 bytes)
+	binary.LittleEndian.PutUint64(buf[privateTableStart+8:], math.Float64bits(m.TotalRate))
 
-	// Write fixed field (TotalRate)
-	binary.LittleEndian.PutUint64(temp[:8], math.Float64bits(m.TotalRate))
-	buf = append(buf, temp[:8]...)
+	// Field 3 (TotalRateInclusive): fixed-length (8 bytes)
+	binary.LittleEndian.PutUint64(buf[privateTableStart+16:], math.Float64bits(m.TotalRateInclusive))
 
-	// Write fixed field (TotalRateInclusive)
-	binary.LittleEndian.PutUint64(temp[:8], math.Float64bits(m.TotalRateInclusive))
-	buf = append(buf, temp[:8]...)
+	// Field 4 (Code): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+24:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Code)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Code)
+	privatePayloadOffset += 4 + len(m.Code)
 
-	// Write string or bytes field (Code)
-	buf = append(buf, []byte(m.Code)...)
+	// Field 5 (Currency): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+28:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Currency)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Currency)
+	privatePayloadOffset += 4 + len(m.Currency)
 
-	// Write string or bytes field (Currency)
-	buf = append(buf, []byte(m.Currency)...)
-
-	// Write string or bytes field (RoomDescription)
-	buf = append(buf, []byte(m.RoomDescription)...)
+	// Field 6 (RoomDescription): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+32:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.RoomDescription)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.RoomDescription)
+	privatePayloadOffset += 4 + len(m.RoomDescription)
 
 	return buf, nil
 }
 
 func (m *RoomType) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 7 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+6]
-	offset += 6
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 15
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 3; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // BookableRate
-			// Unmarshal fixed field (BookableRate)
-			if dataOffset+8 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (BookableRate): fixed-length (8 bytes)
+	if len(data) < privateTableStart+8 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.BookableRate = math.Float64frombits(binary.LittleEndian.Uint64(data[privateTableStart+0:]))
+
+	// Field 2 (TotalRate): fixed-length (8 bytes)
+	if len(data) < privateTableStart+16 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.TotalRate = math.Float64frombits(binary.LittleEndian.Uint64(data[privateTableStart+8:]))
+
+	// Field 3 (TotalRateInclusive): fixed-length (8 bytes)
+	if len(data) < privateTableStart+24 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.TotalRateInclusive = math.Float64frombits(binary.LittleEndian.Uint64(data[privateTableStart+16:]))
+
+	// Field 4 (Code): variable-length
+	if len(data) >= privateTableStart+24+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+24:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Code = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-			m.BookableRate = math.Float64frombits(binary.LittleEndian.Uint64(dataRegion[dataOffset : dataOffset+8]))
-			dataOffset += 8
-		case 2: // TotalRate
-			// Unmarshal fixed field (TotalRate)
-			if dataOffset+8 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
+		}
+	}
+
+	// Field 5 (Currency): variable-length
+	if len(data) >= privateTableStart+28+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+28:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Currency = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-			m.TotalRate = math.Float64frombits(binary.LittleEndian.Uint64(dataRegion[dataOffset : dataOffset+8]))
-			dataOffset += 8
-		case 3: // TotalRateInclusive
-			// Unmarshal fixed field (TotalRateInclusive)
-			if dataOffset+8 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
-			}
-			m.TotalRateInclusive = math.Float64frombits(binary.LittleEndian.Uint64(dataRegion[dataOffset : dataOffset+8]))
-			dataOffset += 8
-		case 4: // Code
-			// Unmarshal string or []byte field (Code)
-			if entry, ok := offsets[4]; ok {
-				m.Code = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 5: // Currency
-			// Unmarshal string or []byte field (Currency)
-			if entry, ok := offsets[5]; ok {
-				m.Currency = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 6: // RoomDescription
-			// Unmarshal string or []byte field (RoomDescription)
-			if entry, ok := offsets[6]; ok {
-				m.RoomDescription = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	// Field 6 (RoomDescription): variable-length
+	if len(data) >= privateTableStart+32+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+32:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.RoomDescription = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
 		}
 	}
@@ -1725,166 +6753,1211 @@ func (m *RoomType) UnmarshalSymphony(data []byte) error {
 	return nil
 }
 
-func (m *ReservationRequest) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 197)
-	var temp [8]byte // Reusable temp buffer for encoding
+type RoomTypeRaw []byte
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2, 3, 4, 5}...)
+func (m RoomTypeRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+func (m *RoomTypeRaw) UnmarshalSymphony(data []byte) error {
+	*m = RoomTypeRaw(data)
+	return nil
+}
 
-	// Field 1 (CustomerName): string or bytes
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of CustomerName
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.CustomerName)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.CustomerName)
+func (m RoomTypeRaw) GetBookableRate() float64 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter BookableRate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter BookableRate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (BookableRate): fixed-length (8 bytes)
+	if len(m) < offsetToPrivate+1+8 {
+		return 0
+	}
+	return math.Float64frombits(binary.LittleEndian.Uint64(m[offsetToPrivate+1:]))
+}
+
+func (m RoomTypeRaw) GetTotalRate() float64 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter TotalRate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter TotalRate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (TotalRate): fixed-length (8 bytes)
+	if len(m) < offsetToPrivate+9+8 {
+		return 0
+	}
+	return math.Float64frombits(binary.LittleEndian.Uint64(m[offsetToPrivate+9:]))
+}
+
+func (m RoomTypeRaw) GetTotalRateInclusive() float64 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter TotalRateInclusive called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter TotalRateInclusive called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 3 (TotalRateInclusive): fixed-length (8 bytes)
+	if len(m) < offsetToPrivate+17+8 {
+		return 0
+	}
+	return math.Float64frombits(binary.LittleEndian.Uint64(m[offsetToPrivate+17:]))
+}
+
+func (m RoomTypeRaw) GetCode() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Code called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Code called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 4 (Code): variable-length
+	if len(m) < offsetToPrivate+25+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+25:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m RoomTypeRaw) GetCurrency() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Currency called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Currency called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 5 (Currency): variable-length
+	if len(m) < offsetToPrivate+29+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+29:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m RoomTypeRaw) GetRoomDescription() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter RoomDescription called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter RoomDescription called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 6 (RoomDescription): variable-length
+	if len(m) < offsetToPrivate+33+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+33:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m *RoomTypeRaw) SetBookableRate(v float64) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter BookableRate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter BookableRate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (BookableRate): fixed-length (8 bytes)
+	if len(*m) < offsetToPrivate+1+8 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint64((*m)[offsetToPrivate+1:], math.Float64bits(v))
+	return nil
+}
+
+func (m *RoomTypeRaw) SetTotalRate(v float64) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter TotalRate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter TotalRate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (TotalRate): fixed-length (8 bytes)
+	if len(*m) < offsetToPrivate+9+8 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint64((*m)[offsetToPrivate+9:], math.Float64bits(v))
+	return nil
+}
+
+func (m *RoomTypeRaw) SetTotalRateInclusive(v float64) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter TotalRateInclusive called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter TotalRateInclusive called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 3 (TotalRateInclusive): fixed-length (8 bytes)
+	if len(*m) < offsetToPrivate+17+8 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint64((*m)[offsetToPrivate+17:], math.Float64bits(v))
+	return nil
+}
+
+func (m *RoomTypeRaw) SetCode(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Code called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Code called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 4 (Code): variable-length
+	if len(*m) < offsetToPrivate+25+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+25:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp RoomType
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Code = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = RoomTypeRaw(newData)
+	return nil
+}
+
+func (m *RoomTypeRaw) SetCurrency(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Currency called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Currency called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 5 (Currency): variable-length
+	if len(*m) < offsetToPrivate+29+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+29:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp RoomType
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Currency = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = RoomTypeRaw(newData)
+	return nil
+}
+
+func (m *RoomTypeRaw) SetRoomDescription(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter RoomDescription called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter RoomDescription called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 6 (RoomDescription): variable-length
+	if len(*m) < offsetToPrivate+33+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+33:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp RoomType
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.RoomDescription = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = RoomTypeRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *ReservationRequest) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *ReservationRequest) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 20 // table
+	size += 4 + len(m.CustomerName)
+	size += 4 // count for HotelId
+	for _, item := range m.HotelId {
+		size += 4 + len(item)
+	}
+	size += 4 + len(m.InDate)
+	size += 4 + len(m.OutDate)
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 20
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (CustomerName): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.CustomerName)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.CustomerName)
+	payloadOffset += 4 + len(m.CustomerName)
 
 	// Field 2 (HotelId): repeated variable-length
-	buf = append(buf, byte(2))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelId
-	buf = append(buf, temp[:2]...)
-	totalLen := 0
+	binary.LittleEndian.PutUint32(buf[tableStart+4:], uint32(payloadStart+payloadOffset))
+	count = len(m.HotelId)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(count))
+	currentOffset = payloadStart + payloadOffset + 4
 	for _, item := range m.HotelId {
-		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
 	}
-	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
-	buf = append(buf, temp[:2]...)
-	offset += totalLen
-
-	// Field 3 (InDate): string or bytes
-	buf = append(buf, byte(3))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of InDate
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.InDate)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.InDate)
-
-	// Field 4 (OutDate): string or bytes
-	buf = append(buf, byte(4))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of OutDate
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.OutDate)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.OutDate)
-
-	offset += 4 // RoomNumber
-
-	// === DATA REGION SECTION ===
-
-	// Write string or bytes field (CustomerName)
-	buf = append(buf, []byte(m.CustomerName)...)
-
-	// Write repeated variable-length field (HotelId)
+	payloadOffset += 4 // count
 	for _, item := range m.HotelId {
-		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
-		buf = append(buf, temp[:4]...)
-		buf = append(buf, []byte(item)...)
+		payloadOffset += 4 + len(item)
 	}
 
-	// Write string or bytes field (InDate)
-	buf = append(buf, []byte(m.InDate)...)
+	// Field 3 (InDate): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+8:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.InDate)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.InDate)
+	payloadOffset += 4 + len(m.InDate)
 
-	// Write string or bytes field (OutDate)
-	buf = append(buf, []byte(m.OutDate)...)
+	// Field 4 (OutDate): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+12:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.OutDate)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.OutDate)
+	payloadOffset += 4 + len(m.OutDate)
 
-	// Write fixed field (RoomNumber)
-	binary.LittleEndian.PutUint32(temp[:4], uint32(m.RoomNumber))
-	buf = append(buf, temp[:4]...)
+	// Field 5 (RoomNumber): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[tableStart+16:], uint32(m.RoomNumber))
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *ReservationRequest) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *ReservationRequest) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (CustomerName): variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.CustomerName = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 2 (HotelId): repeated variable-length
+	if len(data) >= tableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+4:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelId = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelId = append(m.HotelId, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
+					}
+				}
+			}
+		}
+	}
+
+	// Field 3 (InDate): variable-length
+	if len(data) >= tableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+8:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.InDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 4 (OutDate): variable-length
+	if len(data) >= tableStart+12+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+12:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.OutDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 5 (RoomNumber): fixed-length (4 bytes)
+	if len(data) < tableStart+20 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.RoomNumber = int32(binary.LittleEndian.Uint32(data[tableStart+16:]))
+
+	return nil
+}
+
+func (m *ReservationRequest) MarshalSymphony() ([]byte, error) {
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1  // version byte
+	size += 20 // table entries
+	// Field 1 (CustomerName): variable-length payload
+	size += 4 + len(m.CustomerName) // 4 bytes length prefix + data
+	// Field 2 (HotelId): repeated variable-length payload
+	size += 4 // count
+	for _, item := range m.HotelId {
+		size += 4 + len(item) // 4 bytes length prefix + data
+	}
+	// Field 3 (InDate): variable-length payload
+	size += 4 + len(m.InDate) // 4 bytes length prefix + data
+	// Field 4 (OutDate): variable-length payload
+	size += 4 + len(m.OutDate) // 4 bytes length prefix + data
+
+	buf := make([]byte, size)
+
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
+
+	// Calculate offset to private segment
+	publicSegmentSize := 13
+
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 20 bytes table
+	privatePayloadStart := privateTableStart + 20
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (CustomerName): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.CustomerName)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.CustomerName)
+	privatePayloadOffset += 4 + len(m.CustomerName)
+
+	// Field 2 (HotelId): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+4:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	count = len(m.HotelId)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(count))
+	currentOffset = privatePayloadStart + privatePayloadOffset + 4
+	for _, item := range m.HotelId {
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	privatePayloadOffset += 4 // count
+	for _, item := range m.HotelId {
+		privatePayloadOffset += 4 + len(item)
+	}
+
+	// Field 3 (InDate): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+8:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.InDate)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.InDate)
+	privatePayloadOffset += 4 + len(m.InDate)
+
+	// Field 4 (OutDate): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+12:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.OutDate)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.OutDate)
+	privatePayloadOffset += 4 + len(m.OutDate)
+
+	// Field 5 (RoomNumber): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[privateTableStart+16:], uint32(m.RoomNumber))
 
 	return buf, nil
 }
 
 func (m *ReservationRequest) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 6 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+5]
-	offset += 5
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 20
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 4; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // CustomerName
-			// Unmarshal string or []byte field (CustomerName)
-			if entry, ok := offsets[1]; ok {
-				m.CustomerName = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (CustomerName): variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.CustomerName = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 2: // HotelId
-			// Unmarshal repeated variable-length field (HotelId)
-			if entry, ok := offsets[2]; ok {
-				m.HotelId = make([]string, 0)
-				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-				fieldOffset := 0
-				for fieldOffset < len(fieldData) {
-					if fieldOffset+4 > len(fieldData) {
-						return fmt.Errorf("insufficient data for item length")
+		}
+	}
+
+	// Field 2 (HotelId): repeated variable-length
+	if len(data) >= privateTableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+4:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelId = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelId = append(m.HotelId, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
 					}
-					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
-					fieldOffset += 4
-					if itemLen == 0 {
-						m.HotelId = append(m.HotelId, "")
-						continue
-					}
-					if fieldOffset+int(itemLen) > len(fieldData) {
-						return fmt.Errorf("insufficient data for item data")
-					}
-					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
-					fieldOffset += int(itemLen)
-					m.HotelId = append(m.HotelId, string(itemData))
 				}
-				dataOffset += int(entry.length)
 			}
-		case 3: // InDate
-			// Unmarshal string or []byte field (InDate)
-			if entry, ok := offsets[3]; ok {
-				m.InDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	// Field 3 (InDate): variable-length
+	if len(data) >= privateTableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+8:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.InDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 4: // OutDate
-			// Unmarshal string or []byte field (OutDate)
-			if entry, ok := offsets[4]; ok {
-				m.OutDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	// Field 4 (OutDate): variable-length
+	if len(data) >= privateTableStart+12+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+12:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.OutDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 5: // RoomNumber
-			// Unmarshal fixed field (RoomNumber)
-			if dataOffset+4 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
+		}
+	}
+
+	// Field 5 (RoomNumber): fixed-length (4 bytes)
+	if len(data) < privateTableStart+20 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.RoomNumber = int32(binary.LittleEndian.Uint32(data[privateTableStart+16:]))
+
+	return nil
+}
+
+type ReservationRequestRaw []byte
+
+func (m ReservationRequestRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *ReservationRequestRaw) UnmarshalSymphony(data []byte) error {
+	*m = ReservationRequestRaw(data)
+	return nil
+}
+
+func (m ReservationRequestRaw) GetCustomerName() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter CustomerName called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter CustomerName called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (CustomerName): variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m ReservationRequestRaw) GetHotelId() []string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter HotelId called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter HotelId called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (HotelId): repeated variable-length
+	if len(m) < offsetToPrivate+5+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+5:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	count := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	result := make([]string, count)
+	currentOffset := payloadOffset + 4
+	for i := 0; i < count; i++ {
+		if len(m) < currentOffset+4 {
+			return nil
+		}
+		itemLen := int(binary.LittleEndian.Uint32(m[currentOffset:]))
+		if len(m) < currentOffset+4+itemLen {
+			return nil
+		}
+		result[i] = string(m[currentOffset+4 : currentOffset+4+itemLen])
+		currentOffset += 4 + itemLen
+	}
+	return result
+}
+
+func (m ReservationRequestRaw) GetInDate() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter InDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter InDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 3 (InDate): variable-length
+	if len(m) < offsetToPrivate+9+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+9:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m ReservationRequestRaw) GetOutDate() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter OutDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter OutDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 4 (OutDate): variable-length
+	if len(m) < offsetToPrivate+13+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+13:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m ReservationRequestRaw) GetRoomNumber() int32 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter RoomNumber called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter RoomNumber called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 5 (RoomNumber): fixed-length (4 bytes)
+	if len(m) < offsetToPrivate+17+4 {
+		return 0
+	}
+	return int32(binary.LittleEndian.Uint32(m[offsetToPrivate+17:]))
+}
+
+func (m *ReservationRequestRaw) SetCustomerName(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter CustomerName called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter CustomerName called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (CustomerName): variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp ReservationRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.CustomerName = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = ReservationRequestRaw(newData)
+	return nil
+}
+
+func (m *ReservationRequestRaw) SetHotelId(v []string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter HotelId called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter HotelId called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (HotelId): repeated variable-length
+	if len(*m) < offsetToPrivate+5+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+5:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldCount int
+	var oldDataSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldCount = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+		// Calculate old data size: 4 bytes count + for each item: 4 bytes length + data
+		oldDataSize = 4
+		currentOffset := oldPayloadOffset + 4
+		for i := 0; i < oldCount; i++ {
+			if len(*m) < currentOffset+4 {
+				break
 			}
-			m.RoomNumber = int32(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
-			dataOffset += 4
+			itemLen := int(binary.LittleEndian.Uint32((*m)[currentOffset:]))
+			oldDataSize += 4 + itemLen
+			currentOffset += 4 + itemLen
+		}
+	}
+	newCount := len(v)
+	newDataSize := 4 // count
+	for _, item := range v {
+		newDataSize += 4 + len(item) // 4 bytes length + data
+	}
+	if oldPayloadOffset > 0 && newDataSize <= oldDataSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newCount))
+		currentOffset := oldPayloadOffset + 4
+		for _, item := range v {
+			itemLen := len(item)
+			binary.LittleEndian.PutUint32((*m)[currentOffset:], uint32(itemLen))
+			copy((*m)[currentOffset+4:], item)
+			currentOffset += 4 + itemLen
+		}
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp ReservationRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.HotelId = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = ReservationRequestRaw(newData)
+	return nil
+}
+
+func (m *ReservationRequestRaw) SetInDate(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter InDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter InDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 3 (InDate): variable-length
+	if len(*m) < offsetToPrivate+9+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+9:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp ReservationRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.InDate = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = ReservationRequestRaw(newData)
+	return nil
+}
+
+func (m *ReservationRequestRaw) SetOutDate(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter OutDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter OutDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 4 (OutDate): variable-length
+	if len(*m) < offsetToPrivate+13+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+13:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp ReservationRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.OutDate = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = ReservationRequestRaw(newData)
+	return nil
+}
+
+func (m *ReservationRequestRaw) SetRoomNumber(v int32) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter RoomNumber called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter RoomNumber called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 5 (RoomNumber): fixed-length (4 bytes)
+	if len(*m) < offsetToPrivate+17+4 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint32((*m)[offsetToPrivate+17:], uint32(v))
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *ReservationResult) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *ReservationResult) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 4 // table
+	size += 4 // count for HotelId
+	for _, item := range m.HotelId {
+		size += 4 + len(item)
+	}
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 4
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (HotelId): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	count = len(m.HotelId)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(count))
+	currentOffset = payloadStart + payloadOffset + 4
+	for _, item := range m.HotelId {
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	payloadOffset += 4 // count
+	for _, item := range m.HotelId {
+		payloadOffset += 4 + len(item)
+	}
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *ReservationResult) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *ReservationResult) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (HotelId): repeated variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelId = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelId = append(m.HotelId, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
+					}
+				}
+			}
 		}
 	}
 
@@ -1892,100 +7965,354 @@ func (m *ReservationRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *ReservationResult) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 48)
-	var temp [8]byte // Reusable temp buffer for encoding
-
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1}...)
-
-	// === OFFSET TABLE SECTION ===
-	offset := 0
-
-	// Field 1 (HotelId): repeated variable-length
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelId
-	buf = append(buf, temp[:2]...)
-	totalLen := 0
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1 // version byte
+	size += 4 // table entries
+	// Field 1 (HotelId): repeated variable-length payload
+	size += 4 // count
 	for _, item := range m.HotelId {
-		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
+		size += 4 + len(item) // 4 bytes length prefix + data
 	}
-	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
-	buf = append(buf, temp[:2]...)
-	offset += totalLen
 
-	// === DATA REGION SECTION ===
+	buf := make([]byte, size)
 
-	// Write repeated variable-length field (HotelId)
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
+
+	// Calculate offset to private segment
+	publicSegmentSize := 13
+
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 4 bytes table
+	privatePayloadStart := privateTableStart + 4
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (HotelId): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	count = len(m.HotelId)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(count))
+	currentOffset = privatePayloadStart + privatePayloadOffset + 4
 	for _, item := range m.HotelId {
-		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
-		buf = append(buf, temp[:4]...)
-		buf = append(buf, []byte(item)...)
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	privatePayloadOffset += 4 // count
+	for _, item := range m.HotelId {
+		privatePayloadOffset += 4 + len(item)
 	}
 
 	return buf, nil
 }
 
 func (m *ReservationResult) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 2 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+1]
-	offset += 1
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 5
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 1; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // HotelId
-			// Unmarshal repeated variable-length field (HotelId)
-			if entry, ok := offsets[1]; ok {
-				m.HotelId = make([]string, 0)
-				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-				fieldOffset := 0
-				for fieldOffset < len(fieldData) {
-					if fieldOffset+4 > len(fieldData) {
-						return fmt.Errorf("insufficient data for item length")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (HotelId): repeated variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelId = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelId = append(m.HotelId, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
 					}
-					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
-					fieldOffset += 4
-					if itemLen == 0 {
-						m.HotelId = append(m.HotelId, "")
-						continue
-					}
-					if fieldOffset+int(itemLen) > len(fieldData) {
-						return fmt.Errorf("insufficient data for item data")
-					}
-					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
-					fieldOffset += int(itemLen)
-					m.HotelId = append(m.HotelId, string(itemData))
 				}
-				dataOffset += int(entry.length)
+			}
+		}
+	}
+
+	return nil
+}
+
+type ReservationResultRaw []byte
+
+func (m ReservationResultRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *ReservationResultRaw) UnmarshalSymphony(data []byte) error {
+	*m = ReservationResultRaw(data)
+	return nil
+}
+
+func (m ReservationResultRaw) GetHotelId() []string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter HotelId called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter HotelId called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (HotelId): repeated variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	count := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	result := make([]string, count)
+	currentOffset := payloadOffset + 4
+	for i := 0; i < count; i++ {
+		if len(m) < currentOffset+4 {
+			return nil
+		}
+		itemLen := int(binary.LittleEndian.Uint32(m[currentOffset:]))
+		if len(m) < currentOffset+4+itemLen {
+			return nil
+		}
+		result[i] = string(m[currentOffset+4 : currentOffset+4+itemLen])
+		currentOffset += 4 + itemLen
+	}
+	return result
+}
+
+func (m *ReservationResultRaw) SetHotelId(v []string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter HotelId called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter HotelId called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (HotelId): repeated variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldCount int
+	var oldDataSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldCount = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+		// Calculate old data size: 4 bytes count + for each item: 4 bytes length + data
+		oldDataSize = 4
+		currentOffset := oldPayloadOffset + 4
+		for i := 0; i < oldCount; i++ {
+			if len(*m) < currentOffset+4 {
+				break
+			}
+			itemLen := int(binary.LittleEndian.Uint32((*m)[currentOffset:]))
+			oldDataSize += 4 + itemLen
+			currentOffset += 4 + itemLen
+		}
+	}
+	newCount := len(v)
+	newDataSize := 4 // count
+	for _, item := range v {
+		newDataSize += 4 + len(item) // 4 bytes length + data
+	}
+	if oldPayloadOffset > 0 && newDataSize <= oldDataSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newCount))
+		currentOffset := oldPayloadOffset + 4
+		for _, item := range v {
+			itemLen := len(item)
+			binary.LittleEndian.PutUint32((*m)[currentOffset:], uint32(itemLen))
+			copy((*m)[currentOffset+4:], item)
+			currentOffset += 4 + itemLen
+		}
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp ReservationResult
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.HotelId = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = ReservationResultRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *SearchRequest) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *SearchRequest) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 16 // table
+	size += 4 + len(m.InDate)
+	size += 4 + len(m.OutDate)
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 16
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (Lat): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], math.Float32bits(m.Lat))
+
+	// Field 2 (Lon): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[tableStart+4:], math.Float32bits(m.Lon))
+
+	// Field 3 (InDate): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+8:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.InDate)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.InDate)
+	payloadOffset += 4 + len(m.InDate)
+
+	// Field 4 (OutDate): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+12:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.OutDate)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.OutDate)
+	payloadOffset += 4 + len(m.OutDate)
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *SearchRequest) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *SearchRequest) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (Lat): fixed-length (4 bytes)
+	if len(data) < tableStart+4 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(data[tableStart+0:]))
+
+	// Field 2 (Lon): fixed-length (4 bytes)
+	if len(data) < tableStart+8 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(data[tableStart+4:]))
+
+	// Field 3 (InDate): variable-length
+	if len(data) >= tableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+8:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.InDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 4 (OutDate): variable-length
+	if len(data) >= tableStart+12+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+12:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.OutDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
 		}
 	}
@@ -1994,116 +8321,486 @@ func (m *ReservationResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *SearchRequest) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 108)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1  // version byte
+	size += 16 // table entries
+	// Field 3 (InDate): variable-length payload
+	size += 4 + len(m.InDate) // 4 bytes length prefix + data
+	// Field 4 (OutDate): variable-length payload
+	size += 4 + len(m.OutDate) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2, 3, 4}...)
+	buf := make([]byte, size)
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	offset += 4 // Lat
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
 
-	offset += 4 // Lon
+	// Calculate offset to private segment
+	publicSegmentSize := 13
 
-	// Field 3 (InDate): string or bytes
-	buf = append(buf, byte(3))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of InDate
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.InDate)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.InDate)
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
 
-	// Field 4 (OutDate): string or bytes
-	buf = append(buf, byte(4))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of OutDate
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.OutDate)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.OutDate)
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
 
-	// === DATA REGION SECTION ===
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
 
-	// Write fixed field (Lat)
-	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lat))
-	buf = append(buf, temp[:4]...)
+	// Write private fields
+	privateTableStart := privateStart + 1 // 16 bytes table
+	privatePayloadStart := privateTableStart + 16
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
 
-	// Write fixed field (Lon)
-	binary.LittleEndian.PutUint32(temp[:4], math.Float32bits(m.Lon))
-	buf = append(buf, temp[:4]...)
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (Lat): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], math.Float32bits(m.Lat))
 
-	// Write string or bytes field (InDate)
-	buf = append(buf, []byte(m.InDate)...)
+	// Field 2 (Lon): fixed-length (4 bytes)
+	binary.LittleEndian.PutUint32(buf[privateTableStart+4:], math.Float32bits(m.Lon))
 
-	// Write string or bytes field (OutDate)
-	buf = append(buf, []byte(m.OutDate)...)
+	// Field 3 (InDate): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+8:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.InDate)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.InDate)
+	privatePayloadOffset += 4 + len(m.InDate)
+
+	// Field 4 (OutDate): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+12:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.OutDate)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.OutDate)
+	privatePayloadOffset += 4 + len(m.OutDate)
 
 	return buf, nil
 }
 
 func (m *SearchRequest) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 5 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+4]
-	offset += 4
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 10
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 2; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // Lat
-			// Unmarshal fixed field (Lat)
-			if dataOffset+4 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (Lat): fixed-length (4 bytes)
+	if len(data) < privateTableStart+4 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+
+	// Field 2 (Lon): fixed-length (4 bytes)
+	if len(data) < privateTableStart+8 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(data[privateTableStart+4:]))
+
+	// Field 3 (InDate): variable-length
+	if len(data) >= privateTableStart+8+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+8:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.InDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-			m.Lat = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
-			dataOffset += 4
-		case 2: // Lon
-			// Unmarshal fixed field (Lon)
-			if dataOffset+4 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
+		}
+	}
+
+	// Field 4 (OutDate): variable-length
+	if len(data) >= privateTableStart+12+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+12:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.OutDate = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-			m.Lon = math.Float32frombits(binary.LittleEndian.Uint32(dataRegion[dataOffset : dataOffset+4]))
-			dataOffset += 4
-		case 3: // InDate
-			// Unmarshal string or []byte field (InDate)
-			if entry, ok := offsets[3]; ok {
-				m.InDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
-			}
-		case 4: // OutDate
-			// Unmarshal string or []byte field (OutDate)
-			if entry, ok := offsets[4]; ok {
-				m.OutDate = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	return nil
+}
+
+type SearchRequestRaw []byte
+
+func (m SearchRequestRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *SearchRequestRaw) UnmarshalSymphony(data []byte) error {
+	*m = SearchRequestRaw(data)
+	return nil
+}
+
+func (m SearchRequestRaw) GetLat() float32 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Lat called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Lat called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (Lat): fixed-length (4 bytes)
+	if len(m) < offsetToPrivate+1+4 {
+		return 0
+	}
+	return math.Float32frombits(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+}
+
+func (m SearchRequestRaw) GetLon() float32 {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Lon called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Lon called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (Lon): fixed-length (4 bytes)
+	if len(m) < offsetToPrivate+5+4 {
+		return 0
+	}
+	return math.Float32frombits(binary.LittleEndian.Uint32(m[offsetToPrivate+5:]))
+}
+
+func (m SearchRequestRaw) GetInDate() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter InDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter InDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 3 (InDate): variable-length
+	if len(m) < offsetToPrivate+9+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+9:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m SearchRequestRaw) GetOutDate() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter OutDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter OutDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 4 (OutDate): variable-length
+	if len(m) < offsetToPrivate+13+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+13:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
+
+func (m *SearchRequestRaw) SetLat(v float32) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Lat called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Lat called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (Lat): fixed-length (4 bytes)
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint32((*m)[offsetToPrivate+1:], math.Float32bits(v))
+	return nil
+}
+
+func (m *SearchRequestRaw) SetLon(v float32) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Lon called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Lon called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (Lon): fixed-length (4 bytes)
+	if len(*m) < offsetToPrivate+5+4 {
+		return fmt.Errorf("buffer too short")
+	}
+	binary.LittleEndian.PutUint32((*m)[offsetToPrivate+5:], math.Float32bits(v))
+	return nil
+}
+
+func (m *SearchRequestRaw) SetInDate(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter InDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter InDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 3 (InDate): variable-length
+	if len(*m) < offsetToPrivate+9+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+9:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp SearchRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.InDate = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = SearchRequestRaw(newData)
+	return nil
+}
+
+func (m *SearchRequestRaw) SetOutDate(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter OutDate called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter OutDate called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 4 (OutDate): variable-length
+	if len(*m) < offsetToPrivate+13+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+13:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp SearchRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.OutDate = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = SearchRequestRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *SearchResult) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *SearchResult) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 4 // table
+	size += 4 // count for HotelIds
+	for _, item := range m.HotelIds {
+		size += 4 + len(item)
+	}
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 4
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (HotelIds): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	count = len(m.HotelIds)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(count))
+	currentOffset = payloadStart + payloadOffset + 4
+	for _, item := range m.HotelIds {
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	payloadOffset += 4 // count
+	for _, item := range m.HotelIds {
+		payloadOffset += 4 + len(item)
+	}
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *SearchResult) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *SearchResult) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (HotelIds): repeated variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelIds = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelIds = append(m.HotelIds, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
+					}
+				}
 			}
 		}
 	}
@@ -2112,100 +8809,336 @@ func (m *SearchRequest) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *SearchResult) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 48)
-	var temp [8]byte // Reusable temp buffer for encoding
-
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1}...)
-
-	// === OFFSET TABLE SECTION ===
-	offset := 0
-
-	// Field 1 (HotelIds): repeated variable-length
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of HotelIds
-	buf = append(buf, temp[:2]...)
-	totalLen := 0
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1 // version byte
+	size += 4 // table entries
+	// Field 1 (HotelIds): repeated variable-length payload
+	size += 4 // count
 	for _, item := range m.HotelIds {
-		totalLen += 4 + len(item) // 4 bytes for length + (string or bytes) data
+		size += 4 + len(item) // 4 bytes length prefix + data
 	}
-	binary.LittleEndian.PutUint16(temp[:2], uint16(totalLen))
-	buf = append(buf, temp[:2]...)
-	offset += totalLen
 
-	// === DATA REGION SECTION ===
+	buf := make([]byte, size)
 
-	// Write repeated variable-length field (HotelIds)
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
+
+	// Calculate offset to private segment
+	publicSegmentSize := 13
+
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 4 bytes table
+	privatePayloadStart := privateTableStart + 4
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (HotelIds): repeated variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	count = len(m.HotelIds)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(count))
+	currentOffset = privatePayloadStart + privatePayloadOffset + 4
 	for _, item := range m.HotelIds {
-		binary.LittleEndian.PutUint32(temp[:4], uint32(len(item)))
-		buf = append(buf, temp[:4]...)
-		buf = append(buf, []byte(item)...)
+		itemLen := len(item)
+		binary.LittleEndian.PutUint32(buf[currentOffset:], uint32(itemLen))
+		copy(buf[currentOffset+4:], item)
+		currentOffset += 4 + itemLen
+	}
+	privatePayloadOffset += 4 // count
+	for _, item := range m.HotelIds {
+		privatePayloadOffset += 4 + len(item)
 	}
 
 	return buf, nil
 }
 
 func (m *SearchResult) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 2 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+1]
-	offset += 1
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 5
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 1; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // HotelIds
-			// Unmarshal repeated variable-length field (HotelIds)
-			if entry, ok := offsets[1]; ok {
-				m.HotelIds = make([]string, 0)
-				fieldData := dataRegion[entry.offset : entry.offset+entry.length]
-				fieldOffset := 0
-				for fieldOffset < len(fieldData) {
-					if fieldOffset+4 > len(fieldData) {
-						return fmt.Errorf("insufficient data for item length")
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (HotelIds): repeated variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			count = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			m.HotelIds = make([]string, 0, count)
+			currentOffset = payloadOffset + 4
+			for i := 0; i < count; i++ {
+				if len(data) >= currentOffset+4 {
+					itemLen := int(binary.LittleEndian.Uint32(data[currentOffset:]))
+					if len(data) >= currentOffset+4+itemLen {
+						m.HotelIds = append(m.HotelIds, string(data[currentOffset+4:currentOffset+4+itemLen]))
+						currentOffset += 4 + itemLen
 					}
-					itemLen := binary.LittleEndian.Uint32(fieldData[fieldOffset : fieldOffset+4])
-					fieldOffset += 4
-					if itemLen == 0 {
-						m.HotelIds = append(m.HotelIds, "")
-						continue
-					}
-					if fieldOffset+int(itemLen) > len(fieldData) {
-						return fmt.Errorf("insufficient data for item data")
-					}
-					itemData := fieldData[fieldOffset : fieldOffset+int(itemLen)]
-					fieldOffset += int(itemLen)
-					m.HotelIds = append(m.HotelIds, string(itemData))
 				}
-				dataOffset += int(entry.length)
+			}
+		}
+	}
+
+	return nil
+}
+
+type SearchResultRaw []byte
+
+func (m SearchResultRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *SearchResultRaw) UnmarshalSymphony(data []byte) error {
+	*m = SearchResultRaw(data)
+	return nil
+}
+
+func (m SearchResultRaw) GetHotelIds() []string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter HotelIds called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter HotelIds called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (HotelIds): repeated variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return nil
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return nil
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return nil
+	}
+	count := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	result := make([]string, count)
+	currentOffset := payloadOffset + 4
+	for i := 0; i < count; i++ {
+		if len(m) < currentOffset+4 {
+			return nil
+		}
+		itemLen := int(binary.LittleEndian.Uint32(m[currentOffset:]))
+		if len(m) < currentOffset+4+itemLen {
+			return nil
+		}
+		result[i] = string(m[currentOffset+4 : currentOffset+4+itemLen])
+		currentOffset += 4 + itemLen
+	}
+	return result
+}
+
+func (m *SearchResultRaw) SetHotelIds(v []string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter HotelIds called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter HotelIds called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (HotelIds): repeated variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldCount int
+	var oldDataSize int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldCount = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+		// Calculate old data size: 4 bytes count + for each item: 4 bytes length + data
+		oldDataSize = 4
+		currentOffset := oldPayloadOffset + 4
+		for i := 0; i < oldCount; i++ {
+			if len(*m) < currentOffset+4 {
+				break
+			}
+			itemLen := int(binary.LittleEndian.Uint32((*m)[currentOffset:]))
+			oldDataSize += 4 + itemLen
+			currentOffset += 4 + itemLen
+		}
+	}
+	newCount := len(v)
+	newDataSize := 4 // count
+	for _, item := range v {
+		newDataSize += 4 + len(item) // 4 bytes length + data
+	}
+	if oldPayloadOffset > 0 && newDataSize <= oldDataSize {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newCount))
+		currentOffset := oldPayloadOffset + 4
+		for _, item := range v {
+			itemLen := len(item)
+			binary.LittleEndian.PutUint32((*m)[currentOffset:], uint32(itemLen))
+			copy((*m)[currentOffset+4:], item)
+			currentOffset += 4 + itemLen
+		}
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp SearchResult
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.HotelIds = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = SearchResultRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *CheckUserRequest) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *CheckUserRequest) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 8 // table
+	size += 4 + len(m.Username)
+	size += 4 + len(m.Password)
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 8
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (Username): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+0:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Username)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Username)
+	payloadOffset += 4 + len(m.Username)
+
+	// Field 2 (Password): variable-length
+	binary.LittleEndian.PutUint32(buf[tableStart+4:], uint32(payloadStart+payloadOffset))
+	dataLen = len(m.Password)
+	binary.LittleEndian.PutUint32(buf[payloadStart+payloadOffset:], uint32(dataLen))
+	copy(buf[payloadStart+payloadOffset+4:], m.Password)
+	payloadOffset += 4 + len(m.Password)
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *CheckUserRequest) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *CheckUserRequest) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (Username): variable-length
+	if len(data) >= tableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+0:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Username = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
+			}
+		}
+	}
+
+	// Field 2 (Password): variable-length
+	if len(data) >= tableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[tableStart+4:]))
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Password = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
 		}
 	}
@@ -2214,90 +9147,134 @@ func (m *SearchResult) UnmarshalSymphony(data []byte) error {
 }
 
 func (m *CheckUserRequest) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 96)
-	var temp [8]byte // Reusable temp buffer for encoding
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1 // version byte
+	size += 8 // table entries
+	// Field 1 (Username): variable-length payload
+	size += 4 + len(m.Username) // 4 bytes length prefix + data
+	// Field 2 (Password): variable-length payload
+	size += 4 + len(m.Password) // 4 bytes length prefix + data
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1, 2}...)
+	buf := make([]byte, size)
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// Field 1 (Username): string or bytes
-	buf = append(buf, byte(1))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Username
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Username)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Username)
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
 
-	// Field 2 (Password): string or bytes
-	buf = append(buf, byte(2))
-	binary.LittleEndian.PutUint16(temp[:2], uint16(offset)) // offset of Password
-	buf = append(buf, temp[:2]...)
-	binary.LittleEndian.PutUint16(temp[:2], uint16(len(m.Password)))
-	buf = append(buf, temp[:2]...)
-	offset += len(m.Password)
+	// Calculate offset to private segment
+	publicSegmentSize := 13
 
-	// === DATA REGION SECTION ===
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
 
-	// Write string or bytes field (Username)
-	buf = append(buf, []byte(m.Username)...)
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
 
-	// Write string or bytes field (Password)
-	buf = append(buf, []byte(m.Password)...)
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 8 bytes table
+	privatePayloadStart := privateTableStart + 8
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (Username): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+0:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Username)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Username)
+	privatePayloadOffset += 4 + len(m.Username)
+
+	// Field 2 (Password): variable-length
+	binary.LittleEndian.PutUint32(buf[privateTableStart+4:], uint32((privatePayloadStart+privatePayloadOffset)-privateStart))
+	dataLen = len(m.Password)
+	binary.LittleEndian.PutUint32(buf[privatePayloadStart+privatePayloadOffset:], uint32(dataLen))
+	copy(buf[privatePayloadStart+privatePayloadOffset+4:], m.Password)
+	privatePayloadOffset += 4 + len(m.Password)
 
 	return buf, nil
 }
 
 func (m *CheckUserRequest) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 3 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+2]
-	offset += 2
-
-	// === OFFSET TABLE PARSING SECTION ===
-	type offsetEntry struct{ offset, length uint16 }
-	offsets := map[byte]offsetEntry{}
-	offsetTableSize := 10
-	if len(data) < offset+offsetTableSize {
-		return fmt.Errorf("data too short for offset table")
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
 	}
-	for i := 0; i < 2; i++ {
-		entryOffset := offset + i*5
-		fieldID := data[entryOffset]
-		off := binary.LittleEndian.Uint16(data[entryOffset+1 : entryOffset+3])
-		len := binary.LittleEndian.Uint16(data[entryOffset+3 : entryOffset+5])
-		offsets[fieldID] = offsetEntry{off, len}
+
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
+
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
 	}
-	offset += offsetTableSize
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // Username
-			// Unmarshal string or []byte field (Username)
-			if entry, ok := offsets[1]; ok {
-				m.Username = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (Username): variable-length
+	if len(data) >= privateTableStart+0+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+0:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Username = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
-		case 2: // Password
-			// Unmarshal string or []byte field (Password)
-			if entry, ok := offsets[2]; ok {
-				m.Password = string(dataRegion[entry.offset : entry.offset+entry.length])
-				dataOffset += int(entry.length)
+		}
+	}
+
+	// Field 2 (Password): variable-length
+	if len(data) >= privateTableStart+4+4 {
+		payloadOffset = int(binary.LittleEndian.Uint32(data[privateTableStart+4:]))
+		if payloadOffset > 0 {
+			payloadOffset += offsetToPrivate // convert relative offset to absolute
+		}
+		if payloadOffset > 0 && len(data) >= payloadOffset+4 {
+			dataLen = int(binary.LittleEndian.Uint32(data[payloadOffset:]))
+			if len(data) >= payloadOffset+4+dataLen {
+				m.Password = string(data[payloadOffset+4 : payloadOffset+4+dataLen])
 			}
 		}
 	}
@@ -2305,61 +9282,387 @@ func (m *CheckUserRequest) UnmarshalSymphony(data []byte) error {
 	return nil
 }
 
-func (m *CheckUserResult) MarshalSymphony() ([]byte, error) {
-	// Pre-allocate buffer with estimated size
-	buf := make([]byte, 0, 3)
+type CheckUserRequestRaw []byte
 
-	// === HEADER SECTION ===
-	buf = append(buf, 0x00) // layout header
-	buf = append(buf, []byte{1}...)
+func (m CheckUserRequestRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
 
-	// === OFFSET TABLE SECTION ===
-	offset := 0
+func (m *CheckUserRequestRaw) UnmarshalSymphony(data []byte) error {
+	*m = CheckUserRequestRaw(data)
+	return nil
+}
 
-	offset += 1 // Correct
+func (m CheckUserRequestRaw) GetUsername() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Username called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Username called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 1 (Username): variable-length
+	if len(m) < offsetToPrivate+1+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+1:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
 
-	// === DATA REGION SECTION ===
+func (m CheckUserRequestRaw) GetPassword() string {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Password called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private getter Password called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
+	}
+	// Field 2 (Password): variable-length
+	if len(m) < offsetToPrivate+5+4 {
+		return ""
+	}
+	payloadOffset := int(binary.LittleEndian.Uint32(m[offsetToPrivate+5:]))
+	if payloadOffset == 0 {
+		return ""
+	}
+	payloadOffset += offsetToPrivate // convert relative offset to absolute
+	if len(m) < payloadOffset+4 {
+		return ""
+	}
+	dataLen := int(binary.LittleEndian.Uint32(m[payloadOffset:]))
+	if len(m) < payloadOffset+4+dataLen {
+		return ""
+	}
+	return string(m[payloadOffset+4 : payloadOffset+4+dataLen])
+}
 
-	// Write fixed field (Correct)
+func (m *CheckUserRequestRaw) SetUsername(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Username called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Username called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (Username): variable-length
+	if len(*m) < offsetToPrivate+1+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+1:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp CheckUserRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Username = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = CheckUserRequestRaw(newData)
+	return nil
+}
+
+func (m *CheckUserRequestRaw) SetPassword(v string) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Password called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Password called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 2 (Password): variable-length
+	if len(*m) < offsetToPrivate+5+4 {
+		return fmt.Errorf("buffer too short for table entry")
+	}
+	oldPayloadOffset := int(binary.LittleEndian.Uint32((*m)[offsetToPrivate+5:]))
+	if oldPayloadOffset > 0 {
+		oldPayloadOffset += offsetToPrivate // convert relative offset to absolute
+	}
+	var oldDataLen int
+	if oldPayloadOffset > 0 && len(*m) >= oldPayloadOffset+4 {
+		oldDataLen = int(binary.LittleEndian.Uint32((*m)[oldPayloadOffset:]))
+	}
+	newDataLen := len(v)
+	if oldPayloadOffset > 0 && newDataLen <= oldDataLen {
+		// Update in-place (waste space)
+		binary.LittleEndian.PutUint32((*m)[oldPayloadOffset:], uint32(newDataLen))
+		copy((*m)[oldPayloadOffset+4:], v)
+		return nil
+	}
+	// Need to remarshal: unmarshal, update, marshal
+	var temp CheckUserRequest
+	if err := temp.UnmarshalSymphony([]byte(*m)); err != nil {
+		return fmt.Errorf("failed to unmarshal: %w", err)
+	}
+	temp.Password = v
+	newData, err := temp.MarshalSymphony()
+	if err != nil {
+		return fmt.Errorf("failed to marshal: %w", err)
+	}
+	*m = CheckUserRequestRaw(newData)
+	return nil
+}
+
+// MarshalSymphonyPublic marshals only the public fields (without header)
+func (m *CheckUserResult) MarshalSymphonyPublic() ([]byte, error) {
+	return []byte{}, nil
+}
+
+// MarshalSymphonyPrivate marshals only the private fields (without header)
+func (m *CheckUserResult) MarshalSymphonyPrivate() ([]byte, error) {
+	size := 0
+	size += 1 // table
+	buf := make([]byte, size)
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	payloadStart := tableStart + 1
+	payloadOffset := 0
+	_ = payloadStart
+	_ = payloadOffset
+
+	// Field 1 (Correct): fixed-length (1 bytes)
 	if m.Correct {
-		buf = append(buf, 1)
+		buf[tableStart+0] = 1
 	} else {
-		buf = append(buf, 0)
+		buf[tableStart+0] = 0
+	}
+
+	return buf, nil
+}
+
+// UnmarshalSymphonyPublic unmarshals only the public fields (without header)
+func (m *CheckUserResult) UnmarshalSymphonyPublic(data []byte) error {
+	return nil
+}
+
+// UnmarshalSymphonyPrivate unmarshals only the private fields (without header)
+func (m *CheckUserResult) UnmarshalSymphonyPrivate(data []byte) error {
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+	tableStart := 0
+	_ = tableStart
+
+	// Field 1 (Correct): fixed-length (1 bytes)
+	if len(data) < tableStart+1 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Correct = data[tableStart+0] != 0
+
+	return nil
+}
+
+func (m *CheckUserResult) MarshalSymphony() ([]byte, error) {
+	size := 0
+	// Public segment:
+	size += 1  // version byte
+	size += 12 // reserved: offset_to_private, service_name, method_name
+	// Private segment:
+	size += 1 // version byte
+	size += 1 // table entries
+
+	buf := make([]byte, size)
+
+	dataLen := 0 // avoid no new variables warning
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+
+	// === PUBLIC SEGMENT ===
+	buf[0] = 0x01 // version byte
+
+	// Calculate offset to private segment
+	publicSegmentSize := 13
+
+	// Write reserved header
+	binary.LittleEndian.PutUint32(buf[1:5], uint32(publicSegmentSize)) // offset_to_private
+	binary.LittleEndian.PutUint32(buf[5:9], 0)                         // service_id
+	binary.LittleEndian.PutUint32(buf[9:13], 0)                        // method_id
+
+	// Write public fields
+	publicTableStart := 13
+	publicPayloadStart := publicTableStart + 0
+	publicPayloadOffset := 0
+	_ = publicPayloadStart
+	_ = publicPayloadOffset
+
+	// === PRIVATE SEGMENT ===
+	privateStart := publicSegmentSize
+	buf[privateStart] = 0x01 // version byte
+
+	// Write private fields
+	privateTableStart := privateStart + 1 // 1 bytes table
+	privatePayloadStart := privateTableStart + 1
+	privatePayloadOffset := 0
+	_ = privatePayloadStart
+	_ = privatePayloadOffset
+
+	// Private segment offsets are stored relative to privateStart
+	// Field 1 (Correct): fixed-length (1 bytes)
+	if m.Correct {
+		buf[privateTableStart+0] = 1
+	} else {
+		buf[privateTableStart+0] = 0
 	}
 
 	return buf, nil
 }
 
 func (m *CheckUserResult) UnmarshalSymphony(data []byte) error {
-	// === HEADER PARSING SECTION ===
-	if len(data) < 2 {
-		return fmt.Errorf("data too short for header")
+	if len(data) < 13 {
+		return fmt.Errorf("invalid data: too short")
 	}
-	offset := 0
-	_ = data[offset] // header byte (currently unused)
-	offset++
 
-	fieldOrder := data[offset : offset+1]
-	offset += 1
+	// Validate public segment version
+	if data[0] != 0x01 {
+		return fmt.Errorf("invalid data: wrong public version")
+	}
 
-	// === OFFSET TABLE PARSING SECTION ===
+	// Read reserved header
+	offsetToPrivate := int(binary.LittleEndian.Uint32(data[1:5]))
+	// service_name := binary.LittleEndian.Uint32(data[5:9])  // not used yet
+	// method_name := binary.LittleEndian.Uint32(data[9:13])  // not used yet
 
-	// === DATA REGION EXTRACTION SECTION ===
-	dataRegion := data[offset:]
-	dataOffset := 0
+	// Assert private segment exists
+	if offsetToPrivate >= len(data) || data[offsetToPrivate] != 0x01 {
+		return fmt.Errorf("missing private segment")
+	}
 
-	// === FIELD UNMARSHALING SECTION ===
-	for _, fieldNum := range fieldOrder {
-		switch fieldNum {
-		case 1: // Correct
-			// Unmarshal fixed field (Correct)
-			if dataOffset+1 > len(dataRegion) {
-				return fmt.Errorf("insufficient data for fixed field")
-			}
-			m.Correct = dataRegion[dataOffset] != 0
-			dataOffset += 1
+	payloadOffset := 0
+	_ = payloadOffset
+	dataLen := 0
+	_ = dataLen
+	count := 0
+	_ = count
+	currentOffset := 0
+	_ = currentOffset
+
+	// === PUBLIC FIELDS ===
+	publicTableStart := 13
+	_ = publicTableStart
+	// === PRIVATE FIELDS ===
+	privateTableStart := offsetToPrivate + 1
+	_ = privateTableStart
+	// Private segment offsets are relative to offsetToPrivate
+	// Field 1 (Correct): fixed-length (1 bytes)
+	if len(data) < privateTableStart+1 {
+		return fmt.Errorf("invalid data: too short for field")
+	}
+	m.Correct = data[privateTableStart+0] != 0
+
+	return nil
+}
+
+type CheckUserResultRaw []byte
+
+func (m CheckUserResultRaw) MarshalSymphony() ([]byte, error) {
+	return []byte(m), nil
+}
+
+func (m *CheckUserResultRaw) UnmarshalSymphony(data []byte) error {
+	*m = CheckUserResultRaw(data)
+	return nil
+}
+
+func (m CheckUserResultRaw) GetCorrect() bool {
+	// ASSERT: Private field requires complete buffer
+	if len(m) < 5 {
+		panic(fmt.Sprintf("private getter Correct called on invalid buffer: len(m)=%d, need at least 5 bytes", len(m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32(m[1:5]))
+	if offsetToPrivate >= len(m) || m[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(m) {
+			marker = m[offsetToPrivate]
 		}
+		panic(fmt.Sprintf("private getter Correct called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(m), marker))
 	}
+	// Field 1 (Correct): fixed-length (1 bytes)
+	if len(m) < offsetToPrivate+1+1 {
+		return false
+	}
+	return m[offsetToPrivate+1] != 0
+}
 
+func (m *CheckUserResultRaw) SetCorrect(v bool) error {
+	// ASSERT: Private field setter requires complete buffer
+	if len(*m) < 5 {
+		panic(fmt.Sprintf("private setter Correct called on invalid buffer: len(m)=%d, need at least 5 bytes", len(*m)))
+	}
+	offsetToPrivate := int(binary.LittleEndian.Uint32((*m)[1:5]))
+	if offsetToPrivate >= len(*m) || (*m)[offsetToPrivate] != 0x01 {
+		marker := byte(0)
+		if offsetToPrivate < len(*m) {
+			marker = (*m)[offsetToPrivate]
+		}
+		panic(fmt.Sprintf("private setter Correct called on public-only buffer: offsetToPrivate=%d, len(m)=%d, marker=0x%02x (expected 0x01)", offsetToPrivate, len(*m), marker))
+	}
+	// Field 1 (Correct): fixed-length (1 bytes)
+	if len(*m) < offsetToPrivate+1+1 {
+		return fmt.Errorf("buffer too short")
+	}
+	if v {
+		(*m)[offsetToPrivate+1] = 1
+	} else {
+		(*m)[offsetToPrivate+1] = 0
+	}
 	return nil
 }

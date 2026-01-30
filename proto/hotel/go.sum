@@ -1,7 +1,7 @@
 capnproto.org/go/capnp/v3 v3.1.0-alpha.1 h1:8/sMnWuatR99G0L0vmnrXj0zVP0MrlyClRqSmqGYydo=
 capnproto.org/go/capnp/v3 v3.1.0-alpha.1/go.mod h1:2vT5D2dtG8sJGEoEKU17e+j7shdaYp1Myl8X03B3hmc=
-github.com/appnet-org/arpc v0.0.0-20251125232921-a16f2d55e631 h1:8SgqmzXUTSAGpFRj8x0m5DknkCJ68VNEkKs7SKikofU=
-github.com/appnet-org/arpc v0.0.0-20251125232921-a16f2d55e631/go.mod h1:UlPwzxJw2K8pCLd2pxirK4Hi+HbcXG2ruaf3XeRruno=
+github.com/appnet-org/arpc v0.0.0-20260127065040-422057d11fe2 h1:/DmzXJ9J6LydRLsTcECziSp88d+7QFUIzmnPrYt3WWQ=
+github.com/appnet-org/arpc v0.0.0-20260127065040-422057d11fe2/go.mod h1:+1FWTyo2QgqQBW4xuctiM/HwD2mxjdMeurpND+Dmvg4=
 github.com/colega/zeropool v0.0.0-20230505084239-6fb4a4f75381 h1:d5EKgQfRQvO97jnISfR89AiCCCJMwMFoSxUiU0OGCRU=
 github.com/colega/zeropool v0.0.0-20230505084239-6fb4a4f75381/go.mod h1:OU76gHeRo8xrzGJU3F3I1CqX1ekM8dfJw0+wPeMwnp0=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
