@@ -1,0 +1,1403 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    account: user
+  name: hotel-user
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: user
+  name: user
+spec:
+  clusterIP: None
+  ports:
+  - name: arpc-user
+    port: 11006
+    targetPort: 11006
+    protocol: UDP
+  selector:
+    app: user
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: user
+  name: user
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: user
+  template:
+    metadata:
+      labels:
+        app: user
+    spec:
+      serviceAccountName: hotel-user
+      containers:
+      - command:
+        - ./user
+        image: appnetorg/hotel-reservation-arpc:latest
+        imagePullPolicy: Always
+        name: hotel-reserv-user
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
+        ports:
+        - containerPort: 11006
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      - name: symphony-proxy
+        image: appnetorg/symphony-proxy:latest
+        command:
+        - /app/proxy
+        securityContext:
+          runAsUser: 1337
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+        env:
+        - name: LOG_LEVEL
+          value: info
+        - name: ENABLE_PACKET_BUFFERING
+          value: "true"
+      initContainers:
+      - name: set-iptables
+        image: appnetorg/symphony-proxy-init-container:latest
+        command:
+        - /bin/sh
+        - -c
+        - bash /apply_symphony_iptables.sh
+        securityContext:
+          runAsUser: 0
+          capabilities:
+            add:
+            - NET_ADMIN
+      # nodeName: h2.<node-name>
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    account: search
+  name: hotel-search
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: search
+  name: search
+spec:
+  clusterIP: None
+  ports:
+  - name: arpc-search
+    port: 11002
+    targetPort: 11002
+    protocol: UDP
+  selector:
+    app: search
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: search
+  name: search
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: search
+  template:
+    metadata:
+      labels:
+        app: search
+    spec:
+      serviceAccountName: hotel-search
+      containers:
+      - command:
+        - ./search
+        image: appnetorg/hotel-reservation-arpc:latest
+        imagePullPolicy: Always
+        name: hotel-reserv-search
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
+        ports:
+        - containerPort: 11002
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      - name: symphony-proxy
+        image: appnetorg/symphony-proxy:latest
+        command:
+        - /app/proxy
+        securityContext:
+          runAsUser: 1337
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+        env:
+        - name: LOG_LEVEL
+          value: info
+        - name: ENABLE_PACKET_BUFFERING
+          value: "true"
+      initContainers:
+      - name: set-iptables
+        image: appnetorg/symphony-proxy-init-container:latest
+        command:
+        - /bin/sh
+        - -c
+        - bash /apply_symphony_iptables.sh
+        securityContext:
+          runAsUser: 0
+          capabilities:
+            add:
+            - NET_ADMIN
+      # nodeName: h2.<node-name>
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    account: reservation
+  name: hotel-reservation
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: reservation
+  name: reservation
+spec:
+  clusterIP: None
+  ports:
+  - name: arpc-reservation
+    port: 11007
+    targetPort: 11007
+    protocol: UDP
+  selector:
+    app: reservation
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: reservation
+  name: reservation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reservation
+  template:
+    metadata:
+      labels:
+        app: reservation
+    spec:
+      serviceAccountName: hotel-reservation
+      containers:
+      - command:
+        - ./reservation
+        image: appnetorg/hotel-reservation-arpc:latest
+        imagePullPolicy: Always
+        name: hotel-reserv-reservation
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
+        ports:
+        - containerPort: 11007
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      - name: symphony-proxy
+        image: appnetorg/symphony-proxy:latest
+        command:
+        - /app/proxy
+        securityContext:
+          runAsUser: 1337
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+        env:
+        - name: LOG_LEVEL
+          value: info
+        - name: ENABLE_PACKET_BUFFERING
+          value: "true"
+      initContainers:
+      - name: set-iptables
+        image: appnetorg/symphony-proxy-init-container:latest
+        command:
+        - /bin/sh
+        - -c
+        - bash /apply_symphony_iptables.sh
+        securityContext:
+          runAsUser: 0
+          capabilities:
+            add:
+            - NET_ADMIN
+      # nodeName: h4.<node-name>
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    account: recommendation
+  name: hotel-recommendation
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: recommendation
+  name: recommendation
+spec:
+  clusterIP: None
+  ports:
+  - name: arpc-recommendation
+    port: 11005
+    targetPort: 11005
+    protocol: UDP
+  selector:
+    app: recommendation
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: recommendation
+  name: recommendation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: recommendation
+  template:
+    metadata:
+      labels:
+        app: recommendation
+    spec:
+      serviceAccountName: hotel-recommendation
+      containers:
+      - command:
+        - ./recommendation
+        image: appnetorg/hotel-reservation-arpc:latest
+        imagePullPolicy: Always
+        name: hotel-reserv-recommendation
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
+        ports:
+        - containerPort: 11005
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      - name: symphony-proxy
+        image: appnetorg/symphony-proxy:latest
+        command:
+        - /app/proxy
+        securityContext:
+          runAsUser: 1337
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+        env:
+        - name: LOG_LEVEL
+          value: info
+        - name: ENABLE_PACKET_BUFFERING
+          value: "true"
+      initContainers:
+      - name: set-iptables
+        image: appnetorg/symphony-proxy-init-container:latest
+        command:
+        - /bin/sh
+        - -c
+        - bash /apply_symphony_iptables.sh
+        securityContext:
+          runAsUser: 0
+          capabilities:
+            add:
+            - NET_ADMIN
+      # nodeName: h2.<node-name>
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    account: rate
+  name: hotel-rate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: rate
+  name: rate
+spec:
+  clusterIP: None
+  ports:
+  - name: arpc-rate
+    port: 11004
+    targetPort: 11004
+    protocol: UDP
+  selector:
+    app: rate
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: rate
+  name: rate
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rate
+  template:
+    metadata:
+      labels:
+        app: rate
+    spec:
+      serviceAccountName: hotel-rate
+      containers:
+      - command:
+        - ./rate
+        image: appnetorg/hotel-reservation-arpc:latest
+        imagePullPolicy: Always
+        name: hotel-reserv-rate
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
+        ports:
+        - containerPort: 11004
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      - name: symphony-proxy
+        image: appnetorg/symphony-proxy:latest
+        command:
+        - /app/proxy
+        securityContext:
+          runAsUser: 1337
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+        env:
+        - name: LOG_LEVEL
+          value: info
+        - name: ENABLE_PACKET_BUFFERING
+          value: "true"
+      initContainers:
+      - name: set-iptables
+        image: appnetorg/symphony-proxy-init-container:latest
+        command:
+        - /bin/sh
+        - -c
+        - bash /apply_symphony_iptables.sh
+        securityContext:
+          runAsUser: 0
+          capabilities:
+            add:
+            - NET_ADMIN
+      # nodeName: h3.<node-name>
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    account: profile
+  name: hotel-profile
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: profile
+  name: profile
+spec:
+  clusterIP: None
+  ports:
+  - name: arpc-profile
+    port: 11001
+    targetPort: 11001
+    protocol: UDP
+  selector:
+    app: profile
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: profile
+  name: profile
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: profile
+  template:
+    metadata:
+      labels:
+        app: profile
+    spec:
+      serviceAccountName: hotel-profile
+      containers:
+      - command:
+        - ./profile
+        image: appnetorg/hotel-reservation-arpc:latest
+        imagePullPolicy: Always
+        name: hotel-reserv-profile
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
+        ports:
+        - containerPort: 11001
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      - name: symphony-proxy
+        image: appnetorg/symphony-proxy:latest
+        command:
+        - /app/proxy
+        securityContext:
+          runAsUser: 1337
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+        env:
+        - name: LOG_LEVEL
+          value: info
+        - name: ENABLE_PACKET_BUFFERING
+          value: "true"
+      initContainers:
+      - name: set-iptables
+        image: appnetorg/symphony-proxy-init-container:latest
+        command:
+        - /bin/sh
+        - -c
+        - bash /apply_symphony_iptables.sh
+        securityContext:
+          runAsUser: 0
+          capabilities:
+            add:
+            - NET_ADMIN
+      # nodeName: h5.<node-name>
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    account: geo
+  name: hotel-geo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: geo
+  name: geo
+spec:
+  clusterIP: None
+  ports:
+  - name: arpc-geo
+    port: 11003
+    targetPort: 11003
+    protocol: UDP
+  selector:
+    app: geo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: geo
+  name: geo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: geo
+  template:
+    metadata:
+      labels:
+        app: geo
+    spec:
+      serviceAccountName: hotel-geo
+      containers:
+      - command:
+        - ./geo
+        image: appnetorg/hotel-reservation-arpc:latest
+        imagePullPolicy: Always
+        name: hotel-reserv-geo
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
+        ports:
+        - containerPort: 11003
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      - name: symphony-proxy
+        image: appnetorg/symphony-proxy:latest
+        command:
+        - /app/proxy
+        securityContext:
+          runAsUser: 1337
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+        env:
+        - name: LOG_LEVEL
+          value: info
+        - name: ENABLE_PACKET_BUFFERING
+          value: "true"
+      initContainers:
+      - name: set-iptables
+        image: appnetorg/symphony-proxy-init-container:latest
+        command:
+        - /bin/sh
+        - -c
+        - bash /apply_symphony_iptables.sh
+        securityContext:
+          runAsUser: 0
+          capabilities:
+            add:
+            - NET_ADMIN
+      # nodeName: h3.<node-name>
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    account: frontend
+  name: hotel-frontend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: frontend
+  name: frontend
+spec:
+  clusterIP: 10.96.88.88
+  ports:
+  - name: frontend
+    port: 11000
+    targetPort: 11000
+  selector:
+    app: frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: frontend
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      serviceAccountName: hotel-frontend
+      containers:
+      - command:
+        - ./frontend
+        image: appnetorg/hotel-reservation-arpc:latest
+        imagePullPolicy: Always
+        name: hotel-reserv-frontend
+        env:
+        - name: LOG_LEVEL
+          value: "info"
+        - name: LOG_FORMAT
+          value: "console"
+        ports:
+        - containerPort: 11000
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      - name: symphony-proxy
+        image: appnetorg/symphony-proxy:latest
+        command:
+        - /app/proxy
+        securityContext:
+          runAsUser: 1337
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+        env:
+        - name: LOG_LEVEL
+          value: info
+        - name: ENABLE_PACKET_BUFFERING
+          value: "true"
+      initContainers:
+      - name: set-iptables
+        image: appnetorg/symphony-proxy-init-container:latest
+        command:
+        - /bin/sh
+        - -c
+        - bash /apply_symphony_iptables.sh
+        securityContext:
+          runAsUser: 0
+          capabilities:
+            add:
+            - NET_ADMIN
+      # nodeName: h2.<node-name>
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mongodb-user
+  name: mongodb-user
+spec:
+  ports:
+  - name: mongodb-user
+    port: 27017
+    targetPort: 27017
+  selector:
+    app: mongodb-user
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: memcached-reserve
+  name: memcached-reserve
+spec:
+  ports:
+  - name: memcached-reserve
+    port: 11211
+    targetPort: 11211
+  selector:
+    app: memcached-reserve
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mongodb-reservation
+  name: mongodb-reservation
+spec:
+  ports:
+  - name: mongodb-reservation
+    port: 27017
+    targetPort: 27017
+  selector:
+    app: mongodb-reservation
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mongodb-recommendation
+  name: mongodb-recommendation
+spec:
+  ports:
+  - name: mongodb-recommendation
+    port: 27017
+    targetPort: 27017
+  selector:
+    app: mongodb-recommendation
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: memcached-rate
+  name: memcached-rate
+spec:
+  ports:
+  - name: memcached-rate
+    port: 11211
+    targetPort: 11211
+  selector:
+    app: memcached-rate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mongodb-rate
+  name: mongodb-rate
+spec:
+  ports:
+  - name: mongodb-rate
+    port: 27017
+    targetPort: 27017
+  selector:
+    app: mongodb-rate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: memcached-profile
+  name: memcached-profile
+spec:
+  ports:
+  - name: memcached-profile
+    port: 11211
+    targetPort: 11211
+  selector:
+    app: memcached-profile
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mongodb-profile
+  name: mongodb-profile
+spec:
+  ports:
+  - name: mongodb-profile
+    port: 27017
+    targetPort: 27017
+  selector:
+    app: mongodb-profile
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mongodb-geo
+  name: mongodb-geo
+spec:
+  ports:
+  - name: mongodb-geo
+    port: 27017
+    targetPort: 27017
+  selector:
+    app: mongodb-geo
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mongodb-user
+  name: mongodb-user
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-user
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mongodb-user
+    spec:
+      containers:
+      - image: mongo:4.4.6
+        name: hotel-reserv-user-mongo
+        ports:
+        - containerPort: 27017
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+        volumeMounts:
+        - mountPath: /data/db
+          name: user
+      hostname: user-db
+      # nodeName: h2.<node-name>
+      restartPolicy: Always
+      volumes:
+      - name: user
+        persistentVolumeClaim:
+          claimName: user-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: memcached-reserve
+  name: memcached-reserve
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: memcached-reserve
+  template:
+    metadata:
+      labels:
+        app: memcached-reserve
+    spec:
+      containers:
+      - env:
+        - name: MEMCACHED_CACHE_SIZE
+          value: '128'
+        - name: MEMCACHED_THREADS
+          value: '2'
+        image: memcached
+        name: hotel-reserv-reservation-mmc
+        ports:
+        - containerPort: 11211
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      # nodeName: h4.<node-name>
+      restartPolicy: Always
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mongodb-reservation
+  name: mongodb-reservation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-reservation
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mongodb-reservation
+    spec:
+      containers:
+      - image: mongo:4.4.6
+        name: hotel-reserv-reservation-mongo
+        ports:
+        - containerPort: 27017
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+        volumeMounts:
+        - mountPath: /data/db
+          name: reservation
+      hostname: reservation-db
+      # nodeName: h4.<node-name>
+      restartPolicy: Always
+      volumes:
+      - name: reservation
+        persistentVolumeClaim:
+          claimName: reservation-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mongodb-recommendation
+  name: mongodb-recommendation
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-recommendation
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mongodb-recommendation
+    spec:
+      containers:
+      - image: mongo:4.4.6
+        name: hotel-reserv-recommendation-mongo
+        ports:
+        - containerPort: 27017
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+        volumeMounts:
+        - mountPath: /data/db
+          name: recommendation
+      hostname: recommendation-db
+      # nodeName: h2.<node-name>
+      restartPolicy: Always
+      volumes:
+      - name: recommendation
+        persistentVolumeClaim:
+          claimName: recommendation-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mongodb-rate
+  name: mongodb-rate
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-rate
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mongodb-rate
+    spec:
+      containers:
+      - image: mongo:4.4.6
+        name: hotel-reserv-rate-mongo
+        ports:
+        - containerPort: 27017
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+        volumeMounts:
+        - mountPath: /data/db
+          name: rate
+      # nodeName: h3.<node-name>
+      restartPolicy: Always
+      volumes:
+      - name: rate
+        persistentVolumeClaim:
+          claimName: rate-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: memcached-rate
+  name: memcached-rate
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: memcached-rate
+  template:
+    metadata:
+      labels:
+        app: memcached-rate
+    spec:
+      containers:
+      - env:
+        - name: MEMCACHED_CACHE_SIZE
+          value: '128'
+        - name: MEMCACHED_THREADS
+          value: '2'
+        image: memcached
+        name: hotel-reserv-rate-mmc
+        ports:
+        - containerPort: 11211
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      # nodeName: h3.<node-name>
+      restartPolicy: Always
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: memcached-profile
+  name: memcached-profile
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: memcached-profile
+  template:
+    metadata:
+      labels:
+        app: memcached-profile
+    spec:
+      containers:
+      - env:
+        - name: MEMCACHED_CACHE_SIZE
+          value: '128'
+        - name: MEMCACHED_THREADS
+          value: '2'
+        image: memcached
+        name: hotel-reserv-profile-mmc
+        ports:
+        - containerPort: 11211
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      # nodeName: h5.<node-name>
+      restartPolicy: Always
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mongodb-profile
+  name: mongodb-profile
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-profile
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mongodb-profile
+    spec:
+      containers:
+      - image: mongo:4.4.6
+        name: hotel-reserv-profile-mongo
+        ports:
+        - containerPort: 27017
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+        volumeMounts:
+        - mountPath: /data/db
+          name: profile
+      hostname: profile-db
+      # nodeName: h5.<node-name>
+      restartPolicy: Always
+      volumes:
+      - name: profile
+        persistentVolumeClaim:
+          claimName: profile-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mongodb-geo
+  name: mongodb-geo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-geo
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mongodb-geo
+    spec:
+      containers:
+      - image: mongo:4.4.6
+        name: hotel-reserv-geo-mongo
+        ports:
+        - containerPort: 27017
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+        volumeMounts:
+        - mountPath: /data/db
+          name: geo
+      # nodeName: h3.<node-name>
+      restartPolicy: Always
+      volumes:
+      - name: geo
+        persistentVolumeClaim:
+          claimName: geo-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: user-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: user-storage
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: user-pv
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /data/volumes/user-pv
+    type: DirectoryOrCreate
+  storageClassName: user-storage
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: reservation-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: reservation-storage
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: reservation-pv
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /data/volumes/reservation-pv
+    type: DirectoryOrCreate
+  storageClassName: reservation-storage
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: recommendation-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: recommendation-storage
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: recommendation-pv
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /data/volumes/recommendation-pv
+    type: DirectoryOrCreate
+  storageClassName: recommendation-storage
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rate-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: rate-storage
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: rate-pv
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /data/volumes/rate-pv
+    type: DirectoryOrCreate
+  storageClassName: rate-storage
+  volumeMode: Filesystem
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: profile-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: profile-storage
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: profile-pv
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /data/volumes/profile-pv
+    type: DirectoryOrCreate
+  storageClassName: profile-storage
+  volumeMode: Filesystem
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: jaeger
+  name: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+      annotations:
+        sidecar.istio.io/inject: 'false'
+    spec:
+      containers:
+      - image: jaegertracing/all-in-one:latest
+        name: hotel-reserv-jaeger
+        ports:
+        - containerPort: 14269
+        - containerPort: 5778
+        - containerPort: 14268
+        - containerPort: 14267
+        - containerPort: 16686
+        - containerPort: 5775
+          protocol: UDP
+        - containerPort: 6831
+          protocol: UDP
+        - containerPort: 6832
+          protocol: UDP
+        resources:
+          limits:
+            cpu: 1000m
+          requests:
+            cpu: 100m
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: jaeger
+  name: jaeger
+spec:
+  ports:
+  - name: jaeger-14269
+    port: 14269
+    targetPort: 14269
+  - name: jaeger-5778
+    port: 5778
+    targetPort: 5778
+  - name: jaeger-14268
+    port: 14268
+    targetPort: 14268
+  - name: jaeger-14267
+    port: 14267
+    targetPort: 14267
+  - name: jaeger-16686
+    port: 16686
+    targetPort: 16686
+  - name: jaeger-5775
+    port: 5775
+    protocol: UDP
+    targetPort: 5775
+  - name: jaeger-6831
+    port: 6831
+    protocol: UDP
+    targetPort: 6831
+  - name: jaeger-6832
+    port: 6832
+    protocol: UDP
+    targetPort: 6832
+  selector:
+    app: jaeger
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: geo-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: geo-storage
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: geo-pv
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  hostPath:
+    path: /data/volumes/geo-pv
+    type: DirectoryOrCreate
+  storageClassName: geo-storage
+  volumeMode: Filesystem
+---
