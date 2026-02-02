@@ -7,7 +7,7 @@ import (
 
 	"context"
 
-	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
+	pb "github.com/appnetorg/hotel-reservation-arpc/proto"
 	"github.com/google/uuid"
 	"github.com/hailocab/go-geoindex"
 	"github.com/opentracing/opentracing-go"

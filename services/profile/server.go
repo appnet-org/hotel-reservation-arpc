@@ -17,7 +17,7 @@ import (
 
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
-	pb "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
+	pb "github.com/appnetorg/hotel-reservation-arpc/proto"
 	"github.com/google/uuid"
 	"github.com/opentracing/opentracing-go"
 

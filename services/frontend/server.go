@@ -11,7 +11,7 @@ import (
 
 	"github.com/appnet-org/arpc/pkg/rpc"
 	"github.com/appnet-org/arpc/pkg/serializer"
-	hotel "github.com/appnetorg/hotel-reservation-arpc/services/hotel/proto"
+	hotel "github.com/appnetorg/hotel-reservation-arpc/proto"
 	"github.com/appnetorg/hotel-reservation-arpc/tls"
 	"github.com/rs/zerolog/log"
 
