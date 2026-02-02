@@ -8,7 +8,7 @@ option go_package = "./hotel_reservation";
 
 service Geo {
   // Finds the hotels contained nearby the current lat/lon.
-  rpc Nearby(NearbyRequest) returns (NearbyResult);
+  rpc NearbyGeo(NearbyRequest) returns (NearbyResult);
 }
 
 // The latitude and longitude of the current location.

@@ -41,21 +41,21 @@ var serviceIDToName = map[uint32]string{
 
 // Method IDs for Geo
 const (
-	Geo_MethodID_Nearby = 1
+	Geo_MethodID_NearbyGeo = 1
 )
 
 // Method name <-> ID mappings for Geo
 var Geo_methodNameToID = map[string]uint32{
-	"Nearby": Geo_MethodID_Nearby,
+	"NearbyGeo": Geo_MethodID_NearbyGeo,
 }
 
 var Geo_methodIDToName = map[uint32]string{
-	Geo_MethodID_Nearby: "Nearby",
+	Geo_MethodID_NearbyGeo: "NearbyGeo",
 }
 
 // GeoClient is the client API for Geo service.
 type GeoClient interface {
-	Nearby(ctx context.Context, req *NearbyRequest) (*NearbyResult, error)
+	NearbyGeo(ctx context.Context, req *NearbyRequest) (*NearbyResult, error)
 }
 
 type arpcGeoClient struct {
@@ -70,16 +70,16 @@ func NewGeoClient(client *rpc.Client) GeoClient {
 	return &arpcGeoClient{client: client}
 }
 
-func (c *arpcGeoClient) Nearby(ctx context.Context, req *NearbyRequest) (*NearbyResult, error) {
+func (c *arpcGeoClient) NearbyGeo(ctx context.Context, req *NearbyRequest) (*NearbyResult, error) {
 	resp := new(NearbyResult)
-	if err := c.client.Call(ctx, "Geo", "Nearby", req, resp); err != nil {
+	if err := c.client.Call(ctx, "Geo", "NearbyGeo", req, resp); err != nil {
 		return nil, err
 	}
 	return resp, nil
 }
 
 type GeoServer interface {
-	Nearby(ctx context.Context, req *NearbyRequest) (*NearbyResult, context.Context, error)
+	NearbyGeo(ctx context.Context, req *NearbyRequest) (*NearbyResult, context.Context, error)
 }
 
 func RegisterGeoServer(s *rpc.Server, srv GeoServer) {
@@ -88,16 +88,16 @@ func RegisterGeoServer(s *rpc.Server, srv GeoServer) {
 		ServiceID:   ServiceID_Geo,
 		ServiceImpl: srv,
 		MethodsByID: map[uint32]*rpc.MethodDesc{
-			Geo_MethodID_Nearby: {
-				MethodName: "Nearby",
-				MethodID:   Geo_MethodID_Nearby,
-				Handler:    _Geo_Nearby_Handler,
+			Geo_MethodID_NearbyGeo: {
+				MethodName: "NearbyGeo",
+				MethodID:   Geo_MethodID_NearbyGeo,
+				Handler:    _Geo_NearbyGeo_Handler,
 			},
 		},
 	}, srv)
 }
 
-func _Geo_Nearby_Handler(srv any, ctx context.Context, dec func(any) error, req *element.RPCRequest, chain *element.RPCElementChain) (*element.RPCResponse, context.Context, error) {
+func _Geo_NearbyGeo_Handler(srv any, ctx context.Context, dec func(any) error, req *element.RPCRequest, chain *element.RPCElementChain) (*element.RPCResponse, context.Context, error) {
 	req.Payload = new(NearbyRequest)
 	if err := dec(req.Payload); err != nil {
 		return nil, ctx, err
@@ -106,7 +106,7 @@ func _Geo_Nearby_Handler(srv any, ctx context.Context, dec func(any) error, req 
 	if err != nil {
 		return nil, ctx, err
 	}
-	result, ctx, err := srv.(GeoServer).Nearby(ctx, req.Payload.(*NearbyRequest))
+	result, ctx, err := srv.(GeoServer).NearbyGeo(ctx, req.Payload.(*NearbyRequest))
 	if err != nil {
 		return nil, ctx, err
 	}

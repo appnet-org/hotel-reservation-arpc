@@ -66,8 +66,8 @@ func (s *Server) Run() error {
 func (s *Server) Shutdown() {
 }
 
-// Nearby returns all hotels within a given distance.
-func (s *Server) Nearby(ctx context.Context, req *pb.NearbyRequest) (*pb.NearbyResult, context.Context, error) {
+// NearbyGeo returns all hotels within a given distance.
+func (s *Server) NearbyGeo(ctx context.Context, req *pb.NearbyRequest) (*pb.NearbyResult, context.Context, error) {
 	// Check if index is initialized
 	if s.index == nil {
 		log.Error().Msg("Geo index is nil, initializing now")

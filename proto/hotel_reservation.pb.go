@@ -1240,9 +1240,9 @@ const file_hotel_reservation_proto_rawDesc = "" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
 	"\bpassword\x18\x02 \x01(\tR\bpassword\"+\n" +
 	"\x0fCheckUserResult\x12\x18\n" +
-	"\acorrect\x18\x01 \x01(\bR\acorrect2R\n" +
-	"\x03Geo\x12K\n" +
-	"\x06Nearby\x12 .hotel_reservation.NearbyRequest\x1a\x1f.hotel_reservation.NearbyResult2e\n" +
+	"\acorrect\x18\x01 \x01(\bR\acorrect2U\n" +
+	"\x03Geo\x12N\n" +
+	"\tNearbyGeo\x12 .hotel_reservation.NearbyRequest\x1a\x1f.hotel_reservation.NearbyResult2e\n" +
 	"\aProfile\x12Z\n" +
 	"\vGetProfiles\x12%.hotel_reservation.GetProfilesRequest\x1a$.hotel_reservation.GetProfilesResult2\x81\x01\n" +
 	"\x0eRecommendation\x12o\n" +
@@ -1297,7 +1297,7 @@ var file_hotel_reservation_proto_depIdxs = []int32{
 	6,  // 2: hotel_reservation.Hotel.images:type_name -> hotel_reservation.Image
 	11, // 3: hotel_reservation.GetRatesResult.ratePlans:type_name -> hotel_reservation.RatePlan
 	12, // 4: hotel_reservation.RatePlan.roomType:type_name -> hotel_reservation.RoomType
-	0,  // 5: hotel_reservation.Geo.Nearby:input_type -> hotel_reservation.NearbyRequest
+	0,  // 5: hotel_reservation.Geo.NearbyGeo:input_type -> hotel_reservation.NearbyRequest
 	2,  // 6: hotel_reservation.Profile.GetProfiles:input_type -> hotel_reservation.GetProfilesRequest
 	7,  // 7: hotel_reservation.Recommendation.GetRecommendations:input_type -> hotel_reservation.GetRecommendationsRequest
 	9,  // 8: hotel_reservation.Rate.GetRates:input_type -> hotel_reservation.GetRatesRequest
@@ -1305,7 +1305,7 @@ var file_hotel_reservation_proto_depIdxs = []int32{
 	13, // 10: hotel_reservation.Reservation.CheckAvailability:input_type -> hotel_reservation.ReservationRequest
 	15, // 11: hotel_reservation.Search.Nearby:input_type -> hotel_reservation.SearchRequest
 	17, // 12: hotel_reservation.User.CheckUser:input_type -> hotel_reservation.CheckUserRequest
-	1,  // 13: hotel_reservation.Geo.Nearby:output_type -> hotel_reservation.NearbyResult
+	1,  // 13: hotel_reservation.Geo.NearbyGeo:output_type -> hotel_reservation.NearbyResult
 	3,  // 14: hotel_reservation.Profile.GetProfiles:output_type -> hotel_reservation.GetProfilesResult
 	8,  // 15: hotel_reservation.Recommendation.GetRecommendations:output_type -> hotel_reservation.GetRecommendationsResult
 	10, // 16: hotel_reservation.Rate.GetRates:output_type -> hotel_reservation.GetRatesResult

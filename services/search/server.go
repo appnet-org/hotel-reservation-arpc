@@ -105,14 +105,14 @@ func (s *Server) Nearby(ctx context.Context, req *hotel.SearchRequest) (*hotel.S
 	geoCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	nearby, err := s.geoClient.Nearby(geoCtx, &hotel.NearbyRequest{
+	nearby, err := s.geoClient.NearbyGeo(geoCtx, &hotel.NearbyRequest{
 		Lat:       req.Lat,
 		Lon:       req.Lon,
 		Latstring: fmt.Sprintf("%f", req.Lat),
 	})
 	if err != nil {
-		log.Error().Msgf("geoClient.Nearby failed: %v", err)
-		return nil, ctx, fmt.Errorf("geoClient.Nearby failed: %w", err)
+		log.Error().Msgf("geoClient.NearbyGeo failed: %v", err)
+		return nil, ctx, fmt.Errorf("geoClient.NearbyGeo failed: %w", err)
 	}
 
 	// find rates for hotels
