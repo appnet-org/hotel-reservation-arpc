@@ -442,8 +442,8 @@ spec:
   clusterIP: 10.96.88.88
   ports:
   - name: frontend
-    port: 11000
-    targetPort: 11000
+    port: 5000
+    targetPort: 5000
   selector:
     app: frontend
 ---
@@ -476,7 +476,7 @@ spec:
         - name: LOG_FORMAT
           value: "console"
         ports:
-        - containerPort: 11000
+        - containerPort: 5000
         resources:
           limits:
             cpu: 1000m

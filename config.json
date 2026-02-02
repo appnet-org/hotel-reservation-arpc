@@ -1,6 +1,6 @@
 {
   "jaegerAddress": "jaeger:6831",
-  "FrontendPort": "11000",
+  "FrontendPort": "5000",
   "GeoPort": "11003",
   "GeoMongoAddress": "mongodb-geo:27017",
   "ProfilePort": "11001",
